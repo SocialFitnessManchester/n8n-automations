@@ -1,6 +1,8 @@
-# Social Fitness Automations — Overview
+# Glofox → GHL First Class Automation — Overview
 
-This repo holds n8n workflow definitions for automations we've migrated off Zapier. The first automation in here is the **Glofox → GHL First Class** flow. This document covers the full story: why we moved, how the setup works, and how the automation behaves today.
+The deep-dive doc for this project. For a quick "what does this do" summary, see the [README](./README.md) in this folder. For the wider repo context, see the [repo root README](../README.md) and the [ONBOARDING guide](../ONBOARDING.md).
+
+This document covers the full story of the **Glofox → GHL First Class** automation: why we moved off Zapier, how the infrastructure fits together, the per-branch logic, and current state.
 
 ---
 
@@ -27,9 +29,9 @@ Our previous Zapier setup had three separate Zaps per studio (one each for first
 
 ### 2.2 GitHub repo
 
-- **`SocialFitnessManchester/automations`** (this repo) — the source-of-truth for all workflow JSON exports and supporting docs
-- One folder per business process (e.g. `glofox-first-class/`)
-- Inside each, a `workflows/` directory holds the n8n JSON exports — one file per studio
+- **`SocialFitnessManchester/n8n-automations`** — the source-of-truth for all workflow JSON exports and supporting docs
+- One folder per project (e.g. this folder, `glofox-first-class/`)
+- Inside each project folder, a `workflows/` directory holds the n8n JSON exports — one file per studio
 - Cloned locally to `~/projects/automations/`
 
 ### 2.3 Git identity (anonymized)
@@ -127,7 +129,7 @@ flowchart TD
    - Webhook path (e.g. `glofox-first-class-studio-x`)
    - Create a new HTTP Header Auth credential for the new PIT, assign to all three GHL HTTP nodes
    - Replace the Location ID in each GHL HTTP body
-5. **Export the workflow JSON** from n8n and add it to `glofox-first-class/workflows/<studio-name>.json` in this repo. Commit + push.
+5. **Export the workflow JSON** from n8n and add it to `workflows/<studio-name>.json` in this folder. Commit + push.
 6. **Submit a ticket to Glofox support** to register the new webhook URL on the studio's Glofox account.
 
 ---

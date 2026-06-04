@@ -2,6 +2,8 @@
 
 This guide takes a teammate from "I have VS Code with Claude Code installed" to "I can build and modify n8n workflows on this repo, the same way Abhi has been doing." Allow about 30 minutes.
 
+This guide is repo-wide (cloning, git identity, n8n-mcp install, sample prompts). For project-specific context, see the README and `OVERVIEW.md` in each subfolder — e.g. [glofox-first-class/](./glofox-first-class/) for the booking-event automation, or [glofox-n8n-app/](./glofox-n8n-app/) for the custom n8n community node.
+
 The approach throughout: rather than running commands yourself, you ask Claude Code to do them for you using natural language. Sample prompts are in `> blockquotes` below — copy-paste them straight into the Claude Code chat.
 
 ---
@@ -23,14 +25,14 @@ If anything's missing, ask Abhi.
 
 Open Claude Code in VS Code and paste:
 
-> Please clone the SocialFitnessManchester/automations GitHub repo to `~/projects/automations`. If `gh` (the GitHub CLI) isn't installed or authenticated, walk me through that first. Once the repo is cloned, read `OVERVIEW.md` and give me a 5-bullet summary of what this repo is about.
+> Please clone the SocialFitnessManchester/n8n-automations GitHub repo to `~/projects/automations`. If `gh` (the GitHub CLI) isn't installed or authenticated, walk me through that first. Once the repo is cloned, read the root `README.md` and give me a 5-bullet summary of what this repo is about.
 
 Claude Code will:
 
 - Check if you have the `gh` CLI installed; install it if not
 - Walk you through `gh auth login` (you'll authenticate with the shared GitHub account)
 - Clone the repo to `~/projects/automations`
-- Read `OVERVIEW.md` and summarize so you have context
+- Read the root `README.md` and summarize so you have context
 
 ---
 
@@ -91,7 +93,7 @@ You're ready. Here are prompts to get going, ranging from gentle to substantive:
 
 ### Just exploring
 
-> Read `OVERVIEW.md` and the README in `glofox-first-class/`, then tell me which parts of the automation currently work end-to-end and which are still pending.
+> Read the root `README.md` then dig into the README and `OVERVIEW.md` inside `glofox-first-class/`. Tell me which parts of that automation currently work end-to-end and which are still pending.
 
 > Pull the structure of the "Glofox First Class Test" workflow in n8n and explain it to me in plain language.
 

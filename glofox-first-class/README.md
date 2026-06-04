@@ -2,6 +2,8 @@
 
 When a Glofox webhook fires for a member's first-class event (booked, cancelled, or attended), apply the matching tag in Go High Level so the existing GHL workflows take over the rest.
 
+For the deep dive — full architecture, design decisions, history, current state — see [**OVERVIEW.md**](./OVERVIEW.md) in this folder.
+
 ## Flow
 
 1. **Webhook** receives Glofox event. The top-level `type` is `BOOKING_CREATED`, `BOOKING_DELETED`, or `BOOKING_UPDATED`; we route on `payload.status` (`BOOKED` / `CANCELED` / `ATTENDED`).
@@ -32,8 +34,6 @@ Each studio gets its own workflow file in `workflows/`. GHL credential and Locat
 3. **Register the webhook URL with Glofox** for this studio's branch (Glofox staff must do this — see memory note about webhook setup constraint).
 4. **Test:** book a class for a brand-new member, confirm the tag lands; cancel, confirm the swap.
 
-## Known follow-ups
+## Open items
 
-- **ATTENDED branch** — pending Glofox support enabling attended events; we'll wire it once test payloads are flowing.
-- **Branch ID not in sheet** — workflow currently fails silently at the lookup step if no row matches. An error branch would catch this loudly.
-- **Multi-studio consolidation** — every new studio = a Glofox support ticket to register the webhook URL. Argues for moving to one master n8n workflow with dynamic GHL credential/location lookup eventually.
+Tracked as [GitHub Issues](https://github.com/SocialFitnessManchester/n8n-automations/issues) on the parent repo, including: multi-studio consolidation, error handling, attendance-count to GHL custom field, the no-show case, and the eventual switchover from Zapier. See [OVERVIEW.md](./OVERVIEW.md) for context on each.
