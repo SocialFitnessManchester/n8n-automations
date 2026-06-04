@@ -1,0 +1,62 @@
+{
+  "name": "n8n-nodes-glofox",
+  "version": "0.1.0",
+  "description": "Custom n8n community node for Glofox (Social Fitness). Sheet-backed studio dropdown + Lead and Purchase actions with dynamic dropdowns against the live Glofox API.",
+  "keywords": [
+    "n8n-community-node-package",
+    "glofox",
+    "gym",
+    "social-fitness"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/SocialFitnessManchester/n8n-automations/tree/main/glofox-n8n-app",
+  "author": {
+    "name": "Social Fitness Automations",
+    "email": "noreply@social-fitness.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SocialFitnessManchester/n8n-automations.git",
+    "directory": "glofox-n8n-app"
+  },
+  "engines": {
+    "node": ">=20.15"
+  },
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc && gulp build:icons",
+    "dev": "tsc --watch",
+    "format": "prettier nodes credentials --write",
+    "lint": "eslint nodes credentials package.json",
+    "lintfix": "eslint nodes credentials package.json --fix",
+    "prepare": "npm run build"
+  },
+  "files": [
+    "dist"
+  ],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": [
+      "dist/credentials/GlofoxApi.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/Glofox/Glofox.node.js"
+    ]
+  },
+  "dependencies": {
+    "google-auth-library": "^9.6.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "@typescript-eslint/parser": "^7.4.0",
+    "eslint": "^8.57.0",
+    "eslint-plugin-n8n-nodes-base": "^1.16.0",
+    "gulp": "^5.0.0",
+    "n8n-workflow": "*",
+    "prettier": "^3.2.5",
+    "typescript": "^5.4.3"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  }
+}
