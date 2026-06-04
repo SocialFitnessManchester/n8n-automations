@@ -93,7 +93,7 @@ flowchart TD
 7. **Each branch does its GHL action(s):**
    - **BOOKED:** one HTTP call — `POST /contacts/upsert` with email, name, phone, and the `first-class-booked` tag. Creates the contact if missing, updates if existing, all in one shot. GHL's tag-added event triggers the welcome automation.
    - **CANCELED:** two HTTP calls — first an upsert with the `first-class-cancelled` tag, then a `DELETE /contacts/{id}/tags` to remove the `first-class-booked` tag. Removing the booked tag is what makes a future re-booking re-fire the welcome automation (since the tag wouldn't otherwise be a new addition).
-   - **ATTENDED:** not yet wired (see open items below).
+   - **ATTENDED:** one upsert with `first-class-attended` tag, then a `DELETE /contacts/{id}/tags` to remove `first-class-booked` (mirrors the CANCELED pattern).
 
 ### 3.4 Decisions worth knowing about
 
@@ -113,7 +113,7 @@ flowchart TD
 |---|---|---|
 | **First class booked** | ✅ Working | Tested end-to-end on test sub-account. Contact created in GHL with name, email, phone, and tag in a single API call. |
 | **First class cancelled** | ✅ Working | Tested end-to-end. Adds `first-class-cancelled` tag, removes `first-class-booked`. |
-| **First class attended** | ⏸ Pending | Wiring not done. The blocker: when we marked a test booking as attended in Glofox, no webhook fired. Glofox docs and staff suggest `BOOKING_UPDATED` is the event type for status changes, but it doesn't seem to be enabled on our integration. Need to follow up with Glofox support to enable it for the test sub-account. |
+| **First class attended** | ✅ Working | Tested end-to-end via synthetic payload (Glofox is now firing `BOOKING_UPDATED` with `payload.attended: true` to signal attendance — `payload.status` stays `BOOKED`). Adds `first-class-attended` tag, removes `first-class-booked`. |
 
 ---
 
@@ -134,8 +134,10 @@ flowchart TD
 
 ## 6. Open items / what's next
 
-- **ATTENDED branch:** waiting on Glofox support to enable `BOOKING_UPDATED` webhook events on the test sub-account — emailed already, awaiting response. Once events flow, wire similar logic to BOOKED/CANCELED.
+- **Total attendance count to GHL custom field:** for downstream GHL automations triggered on milestones (e.g. 5 / 10 / 25 classes attended). Plan: a parallel branch off `Get Booking Count` that fires on every `BOOKING_UPDATED + attended === true` event (not gated by first-class filter), derives the count via `data.filter(b => b.attended === true).length`, and PUTs/upserts a GHL custom field. Needs the GHL custom field to be created first and its Custom Field ID captured.
 - **No-show case:** if a member books a first class but neither attends nor cancels, we currently have no signal — Glofox's webhook behaviour for this scenario isn't yet known. Needs a follow-up with Glofox support to ask whether a separate event fires (e.g. on auto-mark-as-missed) or whether we need a scheduled job to sweep for stale BOOKED bookings past their `time_finish`. Worth deciding what GHL action a "no-show" should trigger (likely a re-engagement tag).
-- **Multi-studio consolidation:** once the per-studio approach is proven across a few studios, consider collapsing to a single master workflow with dynamic GHL credential lookup. Saves on maintenance and on Glofox support tickets (one webhook URL handles all studios).
+- **GHL sub-account is currently hardcoded per workflow:** the four GHL HTTP nodes each have `locationId` baked into the body and an HTTP Header Auth credential pinned to the test sub-account's PIT. Only the Glofox API creds are looked up from the studio config sheet. Before cloning this workflow to additional studios, extend the sheet with `GHL Location ID` and `GHL Private Integration Token` columns and rewire the GHL nodes to read both from the sheet (analogous to how Glofox creds work today). That turns it into one master workflow that handles every studio.
+- **Multi-studio consolidation:** once the per-studio approach is proven across a few studios, consider collapsing to a single master workflow with dynamic GHL credential lookup. Saves on maintenance and on Glofox support tickets (one webhook URL handles all studios). Depends on the previous item being done.
+- **New workflow: Purchase → first-class nudge:** when a member completes a purchase in Glofox (separate webhook event, payload still TBC), wait 10 minutes, then check if they've booked a class. If yes, apply `first-class-booked` tag as a safety net; if no, apply a nudge tag like `purchase-no-booking-yet` that triggers a "please book your first class" automation in GHL. Same upstream as the First Class workflow (Sheets lookup, member email lookup) plus a Wait node and post-wait booking check. Needs: a sample purchase webhook payload from Glofox + the exact GHL tag name for the nudge automation + Glofox support to register the webhook URL if it's not already firing through the existing endpoint.
 - **Error handling:** the workflow currently fails silently if a branch ID isn't found in the sheet or if a GHL API call returns an error. Adding an error branch with a Slack/email alert would catch issues earlier.
 - **Cut over from Zapier:** the existing Zapier flow is still receiving Glofox webhooks. When we're ready, Glofox needs to switch the registered URL from the Zapier endpoint to the n8n endpoint, and we pause the corresponding Zaps.
