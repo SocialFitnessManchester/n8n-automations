@@ -1,5 +1,7 @@
 # Glofox → GHL: Purchase Nudge Automation
 
+> **▶️ Open in n8n:** [Glofox Purchase Nudge](https://automation.social-fitness.com/workflow/Nf5cGnVRTCIbihGC)
+
 When a member completes a purchase in Glofox (membership purchase event), wait 10 minutes, then check whether they've also booked their first class. If yes, apply the booked tag in GHL as a safety net. If no, apply a nudge tag that triggers a "please book your first class" GHL automation.
 
 For the deep dive on architecture, infrastructure, and design decisions — see [OVERVIEW.md](../glofox-first-class/OVERVIEW.md) in the sibling `glofox-first-class/` project. The two automations share the same upstream pattern (Sheets lookup, Glofox member/bookings calls, GHL upsert) and most of that doc applies here too.
