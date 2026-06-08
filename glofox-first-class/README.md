@@ -1,5 +1,7 @@
 # Glofox → GHL: First Class Automation
 
+> **▶️ Open in n8n:** [Glofox First Class Booked/Cancelled/Attended](https://automation.social-fitness.com/workflow/v3Luxgug3t0f5QJd)
+
 When a Glofox webhook fires for a member's first-class event (booked, cancelled, or attended), apply the matching tag in Go High Level so the existing GHL workflows take over the rest.
 
 For the deep dive — full architecture, design decisions, history, current state — see [**OVERVIEW.md**](./OVERVIEW.md) in this folder.
