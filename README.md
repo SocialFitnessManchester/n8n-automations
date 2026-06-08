@@ -9,6 +9,18 @@ Monorepo for everything Social Fitness automates in n8n. The projects that live 
 | [`glofox-attended-count/`](./glofox-attended-count/) | An n8n workflow that listens for Glofox attendance events (`BOOKING_UPDATED` + `attended`) and pushes the member's **lifetime attended-classes count** to a Go High Level custom field, so GHL automations can fire on milestones (5 / 10 / 25 classes). |
 | [`glofox-n8n-app/`](./glofox-n8n-app/) | A custom n8n community node — published to npm as [`n8n-nodes-glofox`](https://www.npmjs.com/package/n8n-nodes-glofox) — that exposes Glofox **Create Lead** and **Create Purchase** actions with sheet-backed studio selection and dynamic dropdowns. For building **new** automations that push data into Glofox (e.g. Facebook Lead Ad → Glofox Lead). |
 
+## Open in n8n
+
+Direct links to each live workflow (self-hosted at `automation.social-fitness.com`):
+
+| Automation | n8n workflow |
+|---|---|
+| First Class | [Open](https://automation.social-fitness.com/workflow/v3Luxgug3t0f5QJd) |
+| Purchase Nudge | [Open](https://automation.social-fitness.com/workflow/Nf5cGnVRTCIbihGC) |
+| Attended Count | [Open](https://automation.social-fitness.com/workflow/yfMSLNQnB6Y4zf0X) _(draft)_ |
+
+> `glofox-n8n-app` isn't a workflow — it's a custom node published to [npm](https://www.npmjs.com/package/n8n-nodes-glofox).
+
 For onboarding a new teammate to work in this repo with Claude Code, see [**ONBOARDING.md**](./ONBOARDING.md).
 
 For per-project deep dives — architecture, design decisions, history, current state — see each subfolder's own `OVERVIEW.md` (e.g. [`glofox-first-class/OVERVIEW.md`](./glofox-first-class/OVERVIEW.md)).
