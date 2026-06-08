@@ -1,5 +1,7 @@
 # Glofox → GHL Total Classes Attended
 
+> **▶️ Open in n8n:** [DRAFT — Glofox → GHL Total Attended Count](https://automation.social-fitness.com/workflow/yfMSLNQnB6Y4zf0X)
+
 When a member is marked **attended** for a class in Glofox, this automation updates their **"Total Classes Attended"** number on their Go High Level (GHL) contact. That lets GHL automations fire on attendance milestones — e.g. a reward or status upgrade at 5 / 10 / 25 classes.
 
 It is a small, **standalone** workflow — deliberately kept separate from the [First Class automation](../glofox-first-class/) so it stays easy to read and troubleshoot.
