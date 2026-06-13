@@ -72,12 +72,17 @@ flowchart TD
     F -->|BOOKED| G[GHL upsert contact<br/>+ add first-class-booked tag]
     F -->|CANCELED| H[GHL upsert contact<br/>+ add first-class-cancelled tag]
     H --> I[GHL DELETE<br/>first-class-booked tag]
-    F -->|ATTENDED| J[Pending<br/>Glofox needs to enable<br/>BOOKING_UPDATED events]
+    F -->|ATTENDED| J[GHL upsert contact<br/>+ add first-class-attended tag]
+    J --> J2[GHL DELETE<br/>first-class-booked tag]
+    F -->|NO_SHOW| K[GHL upsert contact<br/>+ add first-class-no-show tag]
+    K --> K2[GHL DELETE<br/>first-class-booked tag]
 ```
+
+Failures on any node route to the shared **Error Handler** workflow (`AKbzN48d9DQwMioQ`), wired via the workflow's `errorWorkflow` setting; it posts to Slack `#5c-n8n-errors`.
 
 ### 3.3 Step-by-step
 
-1. **Glofox webhook fires** when a booking is created, deleted, or updated. The top-level `type` field tells you the event kind; the nested `payload.status` is `BOOKED` / `CANCELED` / `ATTENDED`. We route on the latter.
+1. **Glofox webhook fires** when a booking is created, deleted, or updated. The top-level `type` field tells you the event kind (`BOOKING_CREATED` / `BOOKING_DELETED` / `BOOKING_UPDATED`); for `BOOKING_UPDATED` the `payload.attended` boolean distinguishes an attendance (`true`) from a no-show (`false`). We route on `type` + `payload.attended`.
 
 2. **Studio config lookup (Google Sheets).** The webhook payload includes a `metadata.location_id`, which we match against the **Branch ID** column in [this sheet](https://docs.google.com/spreadsheets/d/10JeveuIeXNGsGyDQD5dvFLKzOoOzIN8ffRwszGuu2XA/edit). The row gives us the Glofox API Key + Token for that branch. Storing creds in a sheet (rather than hard-coded in n8n) means non-technical staff can add new studios by adding a row.
 
@@ -88,14 +93,18 @@ flowchart TD
 5. **"Is First Class Event?" filter.** One IF node with branching logic by event status:
    - **BOOKED** event passes if the count of *non-cancelled* bookings is exactly 1. This catches first-ever bookings AND re-bookings after a cancellation (where the member's first booking was cancelled, then they re-booked — we treat the re-booking as their real first class).
    - **CANCELED** event passes if non-cancelled count is 0 AND total bookings is 1 — i.e. this cancellation just removed their only-ever booking. This ensures we don't double-fire if a member cancels multiple times.
-   - **ATTENDED** event passes if attended count is 1.
+   - **ATTENDED** event (`BOOKING_UPDATED` + `attended === true`) passes if attended count is 1.
+   - **NO_SHOW** event (`BOOKING_UPDATED` + `attended === false`) passes if the count of *non-cancelled* bookings is 1.
 
-6. **Switch by event status.** Routes the item to one of three branches: BOOKED, CANCELED, or ATTENDED.
+6. **Switch by event status.** Routes the item to one of four branches: BOOKED, CANCELED, ATTENDED, or NO_SHOW.
 
 7. **Each branch does its GHL action(s):**
    - **BOOKED:** one HTTP call — `POST /contacts/upsert` with email, name, phone, and the `first-class-booked` tag. Creates the contact if missing, updates if existing, all in one shot. GHL's tag-added event triggers the welcome automation.
    - **CANCELED:** two HTTP calls — first an upsert with the `first-class-cancelled` tag, then a `DELETE /contacts/{id}/tags` to remove the `first-class-booked` tag. Removing the booked tag is what makes a future re-booking re-fire the welcome automation (since the tag wouldn't otherwise be a new addition).
    - **ATTENDED:** one upsert with `first-class-attended` tag, then a `DELETE /contacts/{id}/tags` to remove `first-class-booked` (mirrors the CANCELED pattern).
+   - **NO_SHOW:** fires on `BOOKING_UPDATED` + `payload.attended === false` — one upsert with the `first-class-no-show` tag, then a `DELETE /contacts/{id}/tags` to remove `first-class-booked` (mirrors the ATTENDED pattern). _Note: the `first-class-no-show` tag and the hardcoded test location are placeholders pending go-live confirmation._
+
+> The old **"Create a lead"** custom node (an earlier experiment that pushed the member into Glofox as a lead via the `n8n-nodes-glofox` community node) has been **removed** from this workflow — it isn't part of the first-class tagging flow.
 
 ### 3.4 Decisions worth knowing about
 
@@ -116,6 +125,7 @@ flowchart TD
 | **First class booked** | ✅ Working | Tested end-to-end on test sub-account. Contact created in GHL with name, email, phone, and tag in a single API call. |
 | **First class cancelled** | ✅ Working | Tested end-to-end. Adds `first-class-cancelled` tag, removes `first-class-booked`. |
 | **First class attended** | ✅ Working | Tested end-to-end via synthetic payload (Glofox is now firing `BOOKING_UPDATED` with `payload.attended: true` to signal attendance — `payload.status` stays `BOOKED`). Adds `first-class-attended` tag, removes `first-class-booked`. |
+| **First class no-show** | 🟡 Built, pending go-live | Fires on `BOOKING_UPDATED` + `payload.attended: false`. Adds `first-class-no-show` tag, removes `first-class-booked` (mirrors the attended branch). Tag name and hardcoded test location are placeholders to confirm before go-live. |
 
 ---
 
@@ -137,9 +147,9 @@ flowchart TD
 ## 6. Open items / what's next
 
 - **Total attendance count to GHL custom field:** for downstream GHL automations triggered on milestones (e.g. 5 / 10 / 25 classes attended). Plan: a parallel branch off `Get Booking Count` that fires on every `BOOKING_UPDATED + attended === true` event (not gated by first-class filter), derives the count via `data.filter(b => b.attended === true).length`, and PUTs/upserts a GHL custom field. Needs the GHL custom field to be created first and its Custom Field ID captured.
-- **No-show case:** if a member books a first class but neither attends nor cancels, we currently have no signal — Glofox's webhook behaviour for this scenario isn't yet known. Needs a follow-up with Glofox support to ask whether a separate event fires (e.g. on auto-mark-as-missed) or whether we need a scheduled job to sweep for stale BOOKED bookings past their `time_finish`. Worth deciding what GHL action a "no-show" should trigger (likely a re-engagement tag).
+- **No-show case:** now handled by the **NO_SHOW** branch — Glofox fires `BOOKING_UPDATED` with `payload.attended: false`, which we tag as `first-class-no-show` (and remove `first-class-booked`). Still to confirm before go-live: the exact GHL tag name for the re-engagement automation, and moving the location off the hardcoded test value to the studio config sheet.
 - **GHL sub-account is currently hardcoded per workflow:** the four GHL HTTP nodes each have `locationId` baked into the body and an HTTP Header Auth credential pinned to the test sub-account's PIT. Only the Glofox API creds are looked up from the studio config sheet. Before cloning this workflow to additional studios, extend the sheet with `GHL Location ID` and `GHL Private Integration Token` columns and rewire the GHL nodes to read both from the sheet (analogous to how Glofox creds work today). That turns it into one master workflow that handles every studio.
 - **Multi-studio consolidation:** once the per-studio approach is proven across a few studios, consider collapsing to a single master workflow with dynamic GHL credential lookup. Saves on maintenance and on Glofox support tickets (one webhook URL handles all studios). Depends on the previous item being done.
 - **New workflow: Purchase → first-class nudge:** when a member completes a purchase in Glofox (separate webhook event, payload still TBC), wait 10 minutes, then check if they've booked a class. If yes, apply `first-class-booked` tag as a safety net; if no, apply a nudge tag like `purchase-no-booking-yet` that triggers a "please book your first class" automation in GHL. Same upstream as the First Class workflow (Sheets lookup, member email lookup) plus a Wait node and post-wait booking check. Needs: a sample purchase webhook payload from Glofox + the exact GHL tag name for the nudge automation + Glofox support to register the webhook URL if it's not already firing through the existing endpoint.
-- **Error handling:** the workflow currently fails silently if a branch ID isn't found in the sheet or if a GHL API call returns an error. Adding an error branch with a Slack/email alert would catch issues earlier.
+- **Error handling:** ✅ wired — the workflow's `errorWorkflow` setting routes any node failure (missing branch ID in the sheet, GHL API error, etc.) to the shared **Error Handler** workflow (`AKbzN48d9DQwMioQ`), which posts to Slack `#5c-n8n-errors`.
 - **Cut over from Zapier:** the existing Zapier flow is still receiving Glofox webhooks. When we're ready, Glofox needs to switch the registered URL from the Zapier endpoint to the n8n endpoint, and we pause the corresponding Zaps.
