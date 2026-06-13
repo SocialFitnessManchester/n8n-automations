@@ -22,6 +22,9 @@ Direct links to each live workflow (self-hosted at `automation.social-fitness.co
 | Purchase Nudge | [Open](https://automation.social-fitness.com/workflow/Nf5cGnVRTCIbihGC) |
 | Attended Count | [Open](https://automation.social-fitness.com/workflow/yfMSLNQnB6Y4zf0X) _(draft)_ |
 | New Purchase | [Open](https://automation.social-fitness.com/workflow/DzAQM7K2b1az34FE) _(draft)_ |
+| Error Handler (shared) | [Open](https://automation.social-fitness.com/workflow/AKbzN48d9DQwMioQ) |
+
+> All automations route failures to the shared **Error Handler** workflow, which posts to Slack `#5c-n8n-errors`.
 
 > `glofox-n8n-app` isn't a workflow — it's a custom node published to [npm](https://www.npmjs.com/package/n8n-nodes-glofox).
 
