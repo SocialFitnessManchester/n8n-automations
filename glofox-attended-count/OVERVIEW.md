@@ -26,7 +26,7 @@ Glofox Webhook → Only Attended Events → Get Member → Get Bookings → GHL:
 | **Glofox Webhook** | Receives Glofox booking events on path `glofox-attended-count`. |
 | **Only Attended Events** | Single-output gate — stops the run unless `type === BOOKING_UPDATED && payload.attended === true`. Not a branch. |
 | **Get Member** | `GET /members/{user_id}` → the member's **email** (needed to match the GHL contact; not in the webhook or bookings response). |
-| **Get Bookings** | `GET /bookings?user_id={user_id}&attended=true` → read **`total_count`**. |
+| **Get Bookings** | `GET /bookings?user_id={user_id}&attended=true&status=BOOKED` → read **`total_count`**. The `&status=BOOKED` filter excludes cancelled-but-attended bookings, so the count reflects only attended classes that weren't later cancelled (decided in #12). |
 | **GHL: Update Total Attended Count** | `POST /contacts/upsert` writing the count to the "Total Classes Attended" custom field. |
 
 ## 4. Key findings (verified empirically against the test sub-account)
@@ -34,15 +34,17 @@ Glofox Webhook → Only Attended Events → Get Member → Get Bookings → GHL:
 - **The webhook payload is lean** — it carries `user_id`, `type`, and `payload.attended`, but **no count and no email**.
 - **Attendance signal** = `type: BOOKING_UPDATED` + `payload.attended: true`. `payload.status` stays `BOOKED` — it never becomes "ATTENDED".
 - **The bookings API paginates** — `limit` defaults to 50, caps at 100 per page, with `page` / `has_more` / `total_count`.
-- **Use `total_count`, not row-counting** — `?attended=true` then read `total_count` gives the exact lifetime attended count in **one call, immune to pagination**. (Counting the returned rows would silently truncate at 50 — wrong for anyone with 50+ bookings.)
+- **Use `total_count`, not row-counting** — `?attended=true&status=BOOKED` then read `total_count` gives the exact lifetime attended count in **one call, immune to pagination**. (Counting the returned rows would silently truncate at 50 — wrong for anyone with 50+ bookings.)
+- **Exclude cancelled classes** — adding `&status=BOOKED` keeps the count to attended classes that weren't subsequently cancelled (a class can be marked attended and then cancelled). Decided in **#12**.
 - **Email needs a lookup** — it only lives on the member record (`GET /members/{id}`), not on the webhook or the booking.
 - **The attended flag is immediate** — marking a member attended updates the API straight away, even for a class in the future; no need to wait for class time. (Verified: count went 1 → 2 immediately after marking a new attendance.)
 
 ## 5. Current state
 
-- Draft workflow in n8n: **DRAFT — Glofox → GHL Total Attended Count (#3)** (id `yfMSLNQnB6Y4zf0X`), inactive.
-- Tested end-to-end: webhook → filter → member lookup → bookings count all work; the count flows correctly into the GHL request body. Only the final GHL write is blocked by placeholder IDs.
-- **Not committed to `workflows/` yet** — the draft currently has Glofox creds inline for testing; those must move to the studio config sheet before the JSON is exported here (see #13).
+- Draft workflow in n8n: **Glofox → GHL Total Classes Attended** (id `yfMSLNQnB6Y4zf0X`), inactive.
+- Tested end-to-end: webhook → filter → member lookup → bookings count → GHL write all verified green (a test contact's count was set correctly).
+- **Committed to `workflows/glofox-attended-count.json`** (sanitized). ⚠️ The live workflow currently has **hardcoded Glofox creds** (API key/token/branch id inline on the Get Member + Get Bookings nodes) and a GHL `Authorization: Bearer pit-...` header — these are **pending #13** (move Glofox creds to the studio config sheet + switch GHL to a stored credential). In the committed export all of these are replaced with `REPLACE_FROM_STUDIO_SHEET` / `Bearer REPLACE_WITH_GHL_PIT` placeholders.
+- Error handling is wired: the workflow's `errorWorkflow` setting routes failures to the shared **Error Handler** (`AKbzN48d9DQwMioQ`), which posts to Slack `#5c-n8n-errors`.
 
 ## 6. Open items
 
