@@ -1,5 +1,7 @@
 # Social Fitness — n8n Automations
 
+> 📋 **[MASTER CHECKLIST — everything left to test, configure & decide](https://github.com/SocialFitnessManchester/n8n-automations/issues/14)** — start here for the full picture across all automations.
+
 Monorepo for everything Social Fitness automates in n8n. The projects that live here:
 
 | Folder | What it is |
