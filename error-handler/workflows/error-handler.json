@@ -1,0 +1,205 @@
+{
+  "name": "⚠️ Error Handler — Slack Alerts",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "err-trigger",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "C0BAA7LNW3Y",
+          "cachedResultName": "#5c-n8n-errors"
+        },
+        "text": "=:rotating_light: *n8n automation failed*\n*Studio:* {{ $('Extract Branch ID').item.json.location_id ? ($('Lookup Studio').first().json['Studio Name (MUST MATCH GROW EXACT)'] || ('unknown branch ' + $('Extract Branch ID').item.json.location_id)) : 'not identified (failed before studio lookup)' }}\n*Workflow:* {{ $('Error Trigger').item.json.workflow.name }}\n*Failed node:* {{ $('Error Trigger').item.json.execution.lastNodeExecuted }}\n*Error:* {{ $('Error Trigger').item.json.execution.error.message }}\n*Execution:* {{ $('Error Trigger').item.json.execution.url }}",
+        "otherOptions": {}
+      },
+      "id": "slack-alert",
+      "name": "Slack: Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1000,
+        0
+      ],
+      "retryOnFail": true,
+      "webhookId": "149a5ef3-9d9c-4b0f-951a-4ab04c4870b5",
+      "credentials": {
+        "slackApi": {
+          "id": "QEd0yOGZB7VXpmk6",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "id": "eh-get-exec",
+      "name": "Get Failed Execution",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "url": "=https://automation.social-fitness.com/api/v1/executions/{{ $('Error Trigger').item.json.execution.id }}?includeData=true",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "iITPBQHeXXmt7oTS",
+          "name": "n8n API (self)"
+        }
+      },
+      "notes": "Pulls the failed execution's data via the n8n API to recover the original webhook payload (Branch ID). onError=continue so the alert still fires if this fails.",
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "eh-extract",
+      "name": "Extract Branch ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const ex = $input.first().json;\nlet data = ex.data;\nif (typeof data === 'string') { try { data = JSON.parse(data); } catch (e) { data = {}; } }\nlet locationId = null;\ntry {\n  const runData = (data && data.resultData && data.resultData.runData) || {};\n  const wh = runData['Glofox Webhook'];\n  const j = wh && wh[0] && wh[0].data && wh[0].data.main && wh[0].data.main[0] && wh[0].data.main[0][0] && wh[0].data.main[0][0].json;\n  const body = j && j.body;\n  locationId = (body && body.metadata && body.metadata.location_id) || null;\n} catch (e) { locationId = null; }\nreturn [{ json: { location_id: locationId } }];"
+      },
+      "notes": "Pulls metadata.location_id (Branch ID) out of the failed execution's webhook payload. Handles string-or-object data and missing paths -> null."
+    },
+    {
+      "id": "eh-lookup",
+      "name": "Lookup Studio",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "authentication": "serviceAccount",
+        "documentId": {
+          "__rl": true,
+          "value": "10JeveuIeXNGsGyDQD5dvFLKzOoOzIN8ffRwszGuu2XA",
+          "mode": "id",
+          "cachedResultName": "Glofox to GHL - Studio Config"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Branch ID",
+              "lookupValue": "={{ $('Extract Branch ID').item.json.location_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "PvDoggN1HExofTc3",
+          "name": "Google Service Account account"
+        }
+      },
+      "notes": "Looks up the studio name by Branch ID. onError=continue + alwaysOutputData so the alert still fires when there's no match / no branch id.",
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "eh-limit",
+      "name": "One Alert Only",
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        800,
+        0
+      ],
+      "parameters": {
+        "maxItems": 1
+      },
+      "notes": "Caps to one item so duplicate Branch ID rows in the sheet don't fire multiple alerts."
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Failed Execution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Failed Execution": {
+      "main": [
+        [
+          {
+            "node": "Extract Branch ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Branch ID": {
+      "main": [
+        [
+          {
+            "node": "Lookup Studio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Studio": {
+      "main": [
+        [
+          {
+            "node": "One Alert Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One Alert Only": {
+      "main": [
+        [
+          {
+            "node": "Slack: Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "active": false
+}
