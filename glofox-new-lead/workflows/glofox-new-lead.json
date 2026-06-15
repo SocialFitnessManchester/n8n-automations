@@ -1,0 +1,395 @@
+{
+  "name": "Glofox New Lead → GHL Contact",
+  "nodes": [
+    {
+      "id": "l1",
+      "name": "Glofox Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1000,
+        300
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "glofox-new-lead",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "notes": "Receives Glofox lead events. ⚠️ PLACEHOLDER: we do NOT yet have a real LEAD_CREATED payload — see issue for the real shape. Go-live needs Glofox to register this URL. Pin a dummy payload here to test.",
+      "webhookId": "0a1b2c3d-4e5f-6071-8293-a4b5c6d7e8f9"
+    },
+    {
+      "id": "l2",
+      "name": "Only New Leads",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        -780,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.body.type }}",
+              "rightValue": "LEAD_CREATED",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "notes": "⚠️ PLACEHOLDER event name 'LEAD_CREATED' — confirm the real Glofox lead event type from the captured payload."
+    },
+    {
+      "id": "l3",
+      "name": "Lookup Studio Config",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -560,
+        300
+      ],
+      "parameters": {
+        "authentication": "serviceAccount",
+        "documentId": {
+          "__rl": true,
+          "value": "10JeveuIeXNGsGyDQD5dvFLKzOoOzIN8ffRwszGuu2XA",
+          "mode": "id",
+          "cachedResultName": "Glofox to GHL - Studio Config"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Branch ID",
+              "lookupValue": "={{ $('Glofox Webhook').item.json.body.metadata.location_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "PvDoggN1HExofTc3",
+          "name": "Google Service Account account"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "l-guard-if",
+      "name": "Studio In Sheet?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -450,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "studio-found",
+              "leftValue": "={{ $('Lookup Studio Config').item.json['Branch ID'] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "lead-present",
+              "leftValue": "={{ $('Glofox Webhook').item.json.body.payload.lead_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "notes": "Guard: continue only if branch found in sheet AND lead_id present. Else -> Stop and Error (loud alert). ⚠️ PLACEHOLDER: 'lead_id' field path assumed — confirm from real payload."
+    },
+    {
+      "id": "l-guard-err",
+      "name": "Unknown Studio / Bad Input",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        -450,
+        480
+      ],
+      "parameters": {
+        "errorType": "errorMessage",
+        "errorMessage": "=Unknown studio or bad input — Branch ID '{{ $('Glofox Webhook').item.json.body.metadata.location_id }}' not in the config sheet, or missing lead_id '{{ $('Glofox Webhook').item.json.body.payload.lead_id }}'."
+      }
+    },
+    {
+      "id": "l4",
+      "name": "Get Lead Details",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -240,
+        220
+      ],
+      "parameters": {
+        "url": "=https://gf-api.aws.glofox.com/prod/2.0/leads/{{ $('Glofox Webhook').item.json.body.payload.lead_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-api-key",
+              "value": "={{ $('Lookup Studio Config').item.json['API Key'] }}"
+            },
+            {
+              "name": "x-glofox-api-token",
+              "value": "={{ $('Lookup Studio Config').item.json['API Token'] }}"
+            },
+            {
+              "name": "x-glofox-branch-id",
+              "value": "={{ $('Lookup Studio Config').item.json['Branch ID'] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "⚠️ PLACEHOLDER endpoint '/leads/{id}' — confirm Glofox actually exposes a lead-detail endpoint and what it returns (email, name, phone, and whether the offer/interest is here vs on the webhook). If the webhook payload already carries email/name/phone, this node may be unnecessary."
+    },
+    {
+      "id": "l-offer-if",
+      "name": "Has Offer?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -20,
+        220
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "offer-present",
+              "leftValue": "={{ $('Glofox Webhook').item.json.body.payload.offer_name }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "notes": "Splits 'specific offer' leads (FB lead ad / GHL form / studio site with an offer) from 'general enquiry' leads. ⚠️ PLACEHOLDER offer field path 'payload.offer_name' — confirm where (if anywhere) the offer lives in the real payload."
+    },
+    {
+      "id": "l5a",
+      "name": "GHL: Upsert Contact (Offer)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        220,
+        120
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://services.leadconnectorhq.com/contacts/upsert",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Version",
+              "value": "2021-07-28"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"locationId\": \"JHgfCMprry4fxGOzRsYl\",\n  \"email\": \"{{ $('Get Lead Details').item.json.email }}\",\n  \"firstName\": \"{{ $('Get Lead Details').item.json.first_name }}\",\n  \"lastName\": \"{{ $('Get Lead Details').item.json.last_name }}\",\n  \"phone\": \"{{ $('Get Lead Details').item.json.phone }}\",\n  \"tags\": [\"new-lead\", \"lead-with-offer\"],\n  \"customFields\": [\n    {\n      \"key\": \"latest_offer_registered_for\",\n      \"field_value\": \"{{ $('Glofox Webhook').item.json.body.payload.offer_name }}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "MrMlsn2HCSVdVi0O",
+          "name": "HighLevel PIT - Test Sub Account"
+        }
+      },
+      "notes": "Offer branch: upsert + tags ['new-lead','lead-with-offer'] + write 'latest_offer_registered_for'. Upsert (not create) so a contact already in GHL from a FB lead ad / form is updated, not duplicated. ⚠️ Hardcoded test location + PIT (move to sheet for multi-studio, see #13). Tag names are placeholders to finalise with stakeholders."
+    },
+    {
+      "id": "l5b",
+      "name": "GHL: Upsert Contact (General)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        220,
+        320
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://services.leadconnectorhq.com/contacts/upsert",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Version",
+              "value": "2021-07-28"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"locationId\": \"JHgfCMprry4fxGOzRsYl\",\n  \"email\": \"{{ $('Get Lead Details').item.json.email }}\",\n  \"firstName\": \"{{ $('Get Lead Details').item.json.first_name }}\",\n  \"lastName\": \"{{ $('Get Lead Details').item.json.last_name }}\",\n  \"phone\": \"{{ $('Get Lead Details').item.json.phone }}\",\n  \"tags\": [\"new-lead\", \"general-enquiry\"]\n}",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "MrMlsn2HCSVdVi0O",
+          "name": "HighLevel PIT - Test Sub Account"
+        }
+      },
+      "notes": "General-enquiry branch: upsert + tags ['new-lead','general-enquiry']. Deliberately NO customFields — so we don't blank out an offer that was already captured from another source (FB lead ad / form). ⚠️ Hardcoded test location + PIT (move to sheet, see #13). Tag names are placeholders."
+    }
+  ],
+  "connections": {
+    "Glofox Webhook": {
+      "main": [
+        [
+          {
+            "node": "Only New Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Only New Leads": {
+      "main": [
+        [
+          {
+            "node": "Lookup Studio Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Studio Config": {
+      "main": [
+        [
+          {
+            "node": "Studio In Sheet?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Studio In Sheet?": {
+      "main": [
+        [
+          {
+            "node": "Get Lead Details",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unknown Studio / Bad Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Lead Details": {
+      "main": [
+        [
+          {
+            "node": "Has Offer?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Offer?": {
+      "main": [
+        [
+          {
+            "node": "GHL: Upsert Contact (Offer)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GHL: Upsert Contact (General)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "AKbzN48d9DQwMioQ"
+  },
+  "active": false
+}
