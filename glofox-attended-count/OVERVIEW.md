@@ -42,9 +42,12 @@ Glofox Webhook → Only Attended Events → Get Member → Get Bookings → GHL:
 ## 5. Current state
 
 - Draft workflow in n8n: **Glofox → GHL Total Classes Attended** (id `yfMSLNQnB6Y4zf0X`), inactive.
-- Tested end-to-end: webhook → filter → member lookup → bookings count → GHL write all verified green (a test contact's count was set correctly).
-- **Committed to `workflows/glofox-attended-count.json`** (sanitized). ⚠️ The live workflow currently has **hardcoded Glofox creds** (API key/token/branch id inline on the Get Member + Get Bookings nodes) and a GHL `Authorization: Bearer pit-...` header — these are **pending #13** (move Glofox creds to the studio config sheet + switch GHL to a stored credential). In the committed export all of these are replaced with `REPLACE_FROM_STUDIO_SHEET` / `Bearer REPLACE_WITH_GHL_PIT` placeholders.
-- Error handling is wired: the workflow's `errorWorkflow` setting routes failures to the shared **Error Handler** (`AKbzN48d9DQwMioQ`), which posts to Slack `#5c-n8n-errors`.
+- **Now has the standardised studio-config lookup step** (2026-06-15) — was the only automation missing it. Flow: `Webhook → Only Attended Events → Lookup Studio Config → Resolve Studio (by position) → Studio In Sheet? → Get Member → Get Bookings → GHL update`.
+- **All dynamic values pull from the studio sheet.** The lookup is **future-proof against header renames**: a `Lookup Studio Config` Google Sheets node reads **all** rows, and a `Resolve Studio (by position)` Code node matches the branch and reads columns **by position** (after dropping n8n's `row_number`): `0 Studio | 1 Branch ID | 2 API Key | 3 API Token | 4 GHL Location | 5 GHL PIT`. So renaming a column header doesn't break anything.
+- **Glofox creds: ✅ tested green** — Get Member + Get Bookings ran successfully pulling API key/token/branch from the sheet (replaced the old hardcoded values).
+- **GHL location + PIT: wired to the sheet** (positions 4/5) but ⚠️ **not yet green** — the test branch `66cfc853…` has a **duplicate sheet row** ("AI Testing Tool - Test Sub Account" matched first) that holds `"tester"`/`"Done - DG"` where GHL Location/PIT should be, so the upsert 401'd (`locationId: "tester"`). **Fix = clean the sheet: one row per branch with GHL Location/PIT in columns 5/6** (the Abhi Test layout). Tracked in #13.
+- Committed JSON now reflects the live sheet-driven design (no inline creds — all expressions referencing the sheet).
+- Error handling is wired: `errorWorkflow` → shared **Error Handler** (`AKbzN48d9DQwMioQ`) → Slack `#5c-n8n-errors`.
 
 ## 6. Open items
 

@@ -56,7 +56,104 @@
     },
     {
       "parameters": {
-        "url": "=https://gf-api.aws.glofox.com/prod/2.0/bookings?user_id={{ $('Glofox Webhook').item.json.body.payload.user_id }}&attended=true&status=BOOKED",
+        "authentication": "serviceAccount",
+        "documentId": {
+          "__rl": true,
+          "value": "10JeveuIeXNGsGyDQD5dvFLKzOoOzIN8ffRwszGuu2XA",
+          "mode": "id",
+          "cachedResultName": "Glofox to GHL - Studio Config"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "options": {}
+      },
+      "id": "a1000000-0000-0000-0000-000000000006",
+      "name": "Lookup Studio Config",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -624,
+        304
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "PvDoggN1HExofTc3",
+          "name": "Google Service Account account"
+        }
+      },
+      "alwaysOutputData": true,
+      "notes": "Reads ALL rows of the studio config sheet (no name-based filter); matching is done by the next node by column POSITION — future-proof against header renames."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Future-proof studio lookup: match + read columns BY POSITION (header-name-independent).\n// n8n's Google Sheets node prepends a 'row_number' field — drop it so positions line up with the sheet columns.\n// Column order: 0 Studio | 1 Branch ID | 2 API Key | 3 API Token | 4 GHL Location | 5 GHL PIT\nconst loc = String($('Glofox Webhook').first().json.body?.metadata?.location_id ?? '');\nfor (const row of $input.all()) {\n  const o = { ...row.json };\n  delete o.row_number;\n  const v = Object.values(o);\n  if (loc !== '' && String(v[1] ?? '') === loc) {\n    return [{ json: { studioName: v[0] ?? '', branchId: v[1] ?? '', apiKey: v[2] ?? '', apiToken: v[3] ?? '', ghlLocation: v[4] ?? '', ghlPit: v[5] ?? '', matched: true }, pairedItem: { item: 0 } }];\n  }\n}\nreturn [{ json: { branchId: '', apiKey: '', apiToken: '', ghlLocation: '', ghlPit: '', matched: false, locationId: loc }, pairedItem: { item: 0 } }];"
+      },
+      "id": "a1000000-0000-0000-0000-000000000007",
+      "name": "Resolve Studio (by position)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -384,
+        304
+      ],
+      "notes": "Matches the webhook branch (metadata.location_id) against the sheet Branch ID column BY POSITION and exposes branchId/apiKey/apiToken/ghlLocation/ghlPit under stable names. Drops n8n's row_number first. Header renames don't break it. Empty branchId if no match -> guard stops it."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "branch-found",
+              "leftValue": "={{ $json.branchId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1000000-0000-0000-0000-000000000008",
+      "name": "Studio In Sheet?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -144,
+        304
+      ],
+      "notes": "Guard: continue only if a studio row matched. Else -> Stop & Error -> shared Error Handler."
+    },
+    {
+      "parameters": {
+        "errorType": "errorMessage",
+        "errorMessage": "=Unknown studio or bad input — no row in the studio config sheet matches Branch ID '{{ $('Resolve Studio (by position)').item.json.locationId }}'."
+      },
+      "id": "a1000000-0000-0000-0000-000000000009",
+      "name": "Unknown Studio / Bad Input",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        -144,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://gf-api.aws.glofox.com/prod/2.0/members/{{ $('Glofox Webhook').first().json.body.payload.user_id }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -66,15 +163,51 @@
             },
             {
               "name": "x-api-key",
-              "value": "REPLACE_FROM_STUDIO_SHEET"
+              "value": "={{ $('Resolve Studio (by position)').first().json.apiKey }}"
             },
             {
               "name": "x-glofox-api-token",
-              "value": "REPLACE_FROM_STUDIO_SHEET"
+              "value": "={{ $('Resolve Studio (by position)').first().json.apiToken }}"
             },
             {
               "name": "x-glofox-branch-id",
-              "value": "REPLACE_FROM_STUDIO_SHEET"
+              "value": "={{ $('Resolve Studio (by position)').first().json.branchId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1000000-0000-0000-0000-000000000005",
+      "name": "Get Member",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        96,
+        304
+      ],
+      "notes": "Member lookup for email. Glofox creds pulled dynamically from the studio sheet (by position) — was hardcoded."
+    },
+    {
+      "parameters": {
+        "url": "=https://gf-api.aws.glofox.com/prod/2.0/bookings?user_id={{ $('Glofox Webhook').first().json.body.payload.user_id }}&attended=true&status=BOOKED",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-api-key",
+              "value": "={{ $('Resolve Studio (by position)').first().json.apiKey }}"
+            },
+            {
+              "name": "x-glofox-api-token",
+              "value": "={{ $('Resolve Studio (by position)').first().json.apiToken }}"
+            },
+            {
+              "name": "x-glofox-branch-id",
+              "value": "={{ $('Resolve Studio (by position)').first().json.branchId }}"
             }
           ]
         },
@@ -85,10 +218,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        -384,
+        336,
         304
       ],
-      "notes": "Counts attended classes that are NOT cancelled: ?attended=true&status=BOOKED → read total_count. status=BOOKED excludes cancelled-but-attended bookings (a class cancelled after being marked attended). One call, pagination-proof."
+      "notes": "Counts attended, non-cancelled classes -> total_count. Glofox creds pulled dynamically from the studio sheet (by position)."
     },
     {
       "parameters": {
@@ -107,13 +240,13 @@
             },
             {
               "name": "Authorization",
-              "value": "Bearer REPLACE_WITH_GHL_PIT"
+              "value": "=Bearer {{ $('Resolve Studio (by position)').first().json.ghlPit }}"
             }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"locationId\": \"JHgfCMprry4fxGOzRsYl\",\n  \"email\": \"{{ $('Get Member').item.json.email }}\",\n  \"customFields\": [\n    {\n      \"key\": \"glofox_class_attendance\",\n      \"field_value\": {{ $('Glofox: Get Bookings').item.json.total_count }}\n    }\n  ]\n}",
+        "jsonBody": "={\n  \"locationId\": \"{{ $('Resolve Studio (by position)').first().json.ghlLocation }}\",\n  \"email\": \"{{ $('Get Member').item.json.email }}\",\n  \"customFields\": [\n    {\n      \"key\": \"glofox_class_attendance\",\n      \"field_value\": {{ $('Glofox: Get Bookings').item.json.total_count }}\n    }\n  ]\n}",
         "options": {}
       },
       "id": "a1000000-0000-0000-0000-000000000004",
@@ -121,46 +254,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        -144,
+        576,
         304
       ],
-      "notes": "Writes attended total_count to the GHL 'Glofox Class Attendance' custom field via key 'glofox_class_attendance' (canonical id dhYri6EPBlHXpsR2ctT3). locationId JHgfCMprry4fxGOzRsYl = test sub-account (move to sheet for multi-studio). VERIFIED green: Steven's contact set to 2."
-    },
-    {
-      "parameters": {
-        "url": "=https://gf-api.aws.glofox.com/prod/2.0/members/{{ $('Glofox Webhook').item.json.body.payload.user_id }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "x-api-key",
-              "value": "REPLACE_FROM_STUDIO_SHEET"
-            },
-            {
-              "name": "x-glofox-api-token",
-              "value": "REPLACE_FROM_STUDIO_SHEET"
-            },
-            {
-              "name": "x-glofox-branch-id",
-              "value": "REPLACE_FROM_STUDIO_SHEET"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "a1000000-0000-0000-0000-000000000005",
-      "name": "Get Member",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        -624,
-        304
-      ],
-      "notes": "Looks up the member by user_id to get email (not present in webhook or bookings response). Email is how GHL matches the contact."
+      "notes": "Writes total_count to GHL custom field 'glofox_class_attendance'. GHL locationId + PIT pulled from the studio sheet by position (col 4 / col 5). NOTE: needs the branch's sheet row to hold GHL Location/PIT in those columns; a duplicate row without them will 401 (see #13)."
     }
   ],
   "connections": {
@@ -175,22 +272,51 @@
         ]
       ]
     },
-    "Glofox: Get Bookings": {
+    "Only Attended Events": {
       "main": [
         [
           {
-            "node": "GHL: Update Total Attended Count",
+            "node": "Lookup Studio Config",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Only Attended Events": {
+    "Lookup Studio Config": {
+      "main": [
+        [
+          {
+            "node": "Resolve Studio (by position)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Studio (by position)": {
+      "main": [
+        [
+          {
+            "node": "Studio In Sheet?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Studio In Sheet?": {
       "main": [
         [
           {
             "node": "Get Member",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unknown Studio / Bad Input",
             "type": "main",
             "index": 0
           }
@@ -207,11 +333,21 @@
           }
         ]
       ]
+    },
+    "Glofox: Get Bookings": {
+      "main": [
+        [
+          {
+            "node": "GHL: Update Total Attended Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
     "executionOrder": "v1",
-    "binaryMode": "separate",
     "errorWorkflow": "AKbzN48d9DQwMioQ"
   },
   "active": false
