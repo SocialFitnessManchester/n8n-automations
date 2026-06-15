@@ -16,6 +16,8 @@ Because step 4/5 **upsert by email**, a person who already exists in GHL (e.g. f
 
 ## ⚠️ Status: DUMMY / PLACEHOLDER — blocked on the real payload
 
+> **Direction change (2026-06-15):** `/leads` is **deprecated** — leads come via the **`MEMBER_CREATED`** webhook, with member details carried in the payload (no lookup needed), and **no offer** on the event. The workflow still reflects the old `LEAD_CREATED` design pending a real payload. See [#17](https://github.com/SocialFitnessManchester/n8n-automations/issues/17).
+
 We do **not** yet have a real Glofox lead webhook payload, so the event name, the `lead_id` path, the lead-detail endpoint, and where the offer lives are all **assumptions**. The workflow is structurally complete and importable, but every assumed field is flagged in node notes and must be confirmed before testing.
 
 - 🔗 **Payload investigation:** [#17 — capture the real Glofox lead webhook payload](https://github.com/SocialFitnessManchester/n8n-automations/issues/17).

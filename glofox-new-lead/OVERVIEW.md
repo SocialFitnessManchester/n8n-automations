@@ -4,6 +4,8 @@ Deep-dive for this automation. Quick version: [README](./README.md). Repo-wide c
 
 ---
 
+> ⚠️ **Direction change (2026-06-15):** Glofox's `/leads` endpoint is **deprecated**. New leads arrive via the **`MEMBER_CREATED`** webhook (a lead = a member with `lead_status: "LEAD"`), and the member details (`payload.id/first_name/last_name/email/phone`) are **in the event payload** — so the planned `Get Lead Details` lookup isn't needed. `MEMBER_CREATED` carries **no offer**, so the offer/general-enquiry split is unresolved (offer lives on `MEMBERSHIP_CREATED`, handled by [glofox-new-purchase](../glofox-new-purchase/)). The workflow below still reflects the old `LEAD_CREATED` design and will be reworked once a **real `MEMBER_CREATED` payload** is captured. Tracking + reconciliation in [#17](https://github.com/SocialFitnessManchester/n8n-automations/issues/17).
+
 ## 1. What it does
 
 When a **new lead** is created in Glofox, sync them into Go High Level as a contact so GHL nurture automations can run — capturing the **offer** the lead came in for when one exists, and handling **general enquiries** (no offer) without clobbering offer data captured elsewhere.
