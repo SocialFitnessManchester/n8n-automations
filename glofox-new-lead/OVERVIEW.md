@@ -60,6 +60,18 @@ Tracked in [#17 — capture the real Glofox lead webhook payload](https://github
 ## 5. Current state
 
 - **Created in n8n** as **Glofox New Lead → GHL Contact** (id `FqmDta5ldKcD4Nzq`), **inactive/draft**. Validated green (0 errors). Importable JSON mirror at [`workflows/glofox-new-lead.json`](./workflows/glofox-new-lead.json).
+
+### Stress test (2026-06-15) — same regime as the sibling workflows
+
+Fired edge-case webhook payloads via `curl` at the live endpoint and checked routing:
+
+| Case | Payload | Result |
+|---|---|---|
+| Wrong event type | `type` ≠ `LEAD_CREATED` | ✅ Filter "Only New Leads" drops it (no-op, ~38ms, no alert). |
+| Unknown branch | `LEAD_CREATED`, branch `…deadbeef` | ✅ Guard "Studio In Sheet?" → Stop & Error (clean message) → Error Handler. |
+| Empty `metadata`/`payload` | `{}` / `{}` | 🔴→✅ **Found a bug, then fixed it.** |
+
+**Bug found & fixed:** a missing `metadata.location_id` (undefined) made the Google Sheets lookup throw a raw `TypeError: Cannot read properties of undefined (reading 'toString')` **before** reaching the guard — an ungraceful failure. Fixed by making the lookup value null-safe: `={{ ($('Glofox Webhook').item.json.body.metadata || {}).location_id || 'NO_BRANCH_ID' }}`. Re-tested: the empty case now flows to the guard and stops cleanly with the descriptive "bad input" message. ⚠️ **The same latent bug exists in the sibling workflows** (New Purchase, First Class, etc.) — they share the lookup-then-guard pattern and were only ever tested with a *present* (if fake) branch ID. Tracked for hardening in [#18](https://github.com/SocialFitnessManchester/n8n-automations/issues/18).
 - ⚠️ **Dummy** — built on assumed field paths (see §4); cannot be tested for real until the lead payload lands (#17).
 - Error handling wired: `errorWorkflow` → shared Error Handler (`AKbzN48d9DQwMioQ` → Slack `#5c-n8n-errors`).
 - Hardcoded test location (`JHgfCMprry4fxGOzRsYl`) + test-sub-account PIT, same as the sibling workflows; move to the studio config sheet for multi-studio (#13).
