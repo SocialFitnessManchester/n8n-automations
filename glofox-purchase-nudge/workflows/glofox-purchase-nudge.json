@@ -71,7 +71,7 @@
           "values": [
             {
               "lookupColumn": "Branch ID",
-              "lookupValue": "={{ $('Glofox Webhook').item.json.body.metadata.location_id }}"
+              "lookupValue": "={{ ($('Glofox Webhook').item.json.body.metadata || {}).location_id || 'NO_BRANCH_ID' }}"
             }
           ]
         },
