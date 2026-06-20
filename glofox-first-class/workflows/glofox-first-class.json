@@ -616,20 +616,6 @@
       "notes": "Guard: only continue if the branch was found in the sheet AND a user_id is present. Otherwise -> Stop and Error (loud alert) instead of silently halting."
     },
     {
-      "id": "fc-guard-err",
-      "name": "Unknown Studio / Bad Input",
-      "type": "n8n-nodes-base.stopAndError",
-      "typeVersion": 1,
-      "position": [
-        -576,
-        400
-      ],
-      "parameters": {
-        "errorType": "errorMessage",
-        "errorMessage": "=Unknown studio or bad input — Branch ID '{{ $('Glofox Webhook').item.json.body.Metadata.location_id }}' not in the config sheet, or missing user_id '{{ $('Glofox Webhook').item.json.body.Payload.user_id }}'."
-      }
-    },
-    {
       "id": "save-branch-filter",
       "name": "Save Branch ID (filter)",
       "type": "n8n-nodes-base.executionData",
@@ -783,13 +769,7 @@
             "index": 0
           }
         ],
-        [
-          {
-            "node": "Unknown Studio / Bad Input",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        []
       ]
     },
     "Save Branch ID (filter)": {
