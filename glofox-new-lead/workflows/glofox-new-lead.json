@@ -140,20 +140,6 @@
       "notes": "Guard: continue only if branch found in sheet AND lead_id present. Else -> Stop and Error (loud alert). ⚠️ PLACEHOLDER: 'lead_id' field path assumed — confirm from real payload."
     },
     {
-      "id": "l-guard-err",
-      "name": "Unknown Studio / Bad Input",
-      "type": "n8n-nodes-base.stopAndError",
-      "typeVersion": 1,
-      "position": [
-        -450,
-        480
-      ],
-      "parameters": {
-        "errorType": "errorMessage",
-        "errorMessage": "=Unknown studio or bad input — Branch ID '{{ $('Glofox Webhook').item.json.body.Metadata.location_id }}' not in the config sheet, or missing lead_id '{{ $('Glofox Webhook').item.json.body.Payload.lead_id }}'."
-      }
-    },
-    {
       "id": "l4",
       "name": "Get Lead Details",
       "type": "n8n-nodes-base.httpRequest",
@@ -366,13 +352,6 @@
         [
           {
             "node": "Get Lead Details",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Unknown Studio / Bad Input",
             "type": "main",
             "index": 0
           }
