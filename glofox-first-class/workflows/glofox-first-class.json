@@ -38,7 +38,7 @@
           "values": [
             {
               "lookupColumn": "Branch ID",
-              "lookupValue": "={{ ($('Glofox Webhook').item.json.body.metadata || {}).location_id || 'NO_BRANCH_ID' }}"
+              "lookupValue": "={{ ($('Glofox Webhook').item.json.body.Metadata || {}).location_id || 'NO_BRANCH_ID' }}"
             }
           ]
         },
@@ -62,7 +62,7 @@
     },
     {
       "parameters": {
-        "url": "=https://gf-api.aws.glofox.com/prod/2.0/members/{{ $('Glofox Webhook').item.json.body.payload.user_id }}",
+        "url": "=https://gf-api.aws.glofox.com/prod/2.0/members/{{ $('Glofox Webhook').item.json.body.Payload.user_id }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -97,7 +97,7 @@
     },
     {
       "parameters": {
-        "url": "=https://gf-api.aws.glofox.com/prod/2.0/bookings?user_id={{ $('Glofox Webhook').item.json.body.payload.user_id }}",
+        "url": "=https://gf-api.aws.glofox.com/prod/2.0/bookings?user_id={{ $('Glofox Webhook').item.json.body.Payload.user_id }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -142,7 +142,7 @@
           "conditions": [
             {
               "id": "first-class-check",
-              "leftValue": "={{ $('Glofox Webhook').item.json.body.type === 'BOOKING_CREATED' ? $('Get Booking Count').item.json.data.filter(b => b.status !== 'CANCELED').length === 1 : $('Glofox Webhook').item.json.body.type === 'BOOKING_DELETED' ? $('Get Booking Count').item.json.data.filter(b => b.status !== 'CANCELED').length === 0 && $('Get Booking Count').item.json.data.length === 1 : ($('Glofox Webhook').item.json.body.type === 'BOOKING_UPDATED' && $('Glofox Webhook').item.json.body.payload.attended === true) ? $('Get Booking Count').item.json.data.filter(b => b.attended === true).length === 1 : ($('Glofox Webhook').item.json.body.type === 'BOOKING_UPDATED' && $('Glofox Webhook').item.json.body.payload.attended === false) ? $('Get Booking Count').item.json.data.filter(b => b.status !== 'CANCELED').length === 1 : false }}",
+              "leftValue": "={{ $('Glofox Webhook').item.json.body.Type === 'BOOKING_CREATED' ? $('Get Booking Count').item.json.data.filter(b => b.status !== 'CANCELED').length === 1 : $('Glofox Webhook').item.json.body.Type === 'BOOKING_DELETED' ? $('Get Booking Count').item.json.data.filter(b => b.status !== 'CANCELED').length === 0 && $('Get Booking Count').item.json.data.length === 1 : ($('Glofox Webhook').item.json.body.Type === 'BOOKING_UPDATED' && $('Glofox Webhook').item.json.body.Payload.attended === true) ? $('Get Booking Count').item.json.data.filter(b => b.attended === true).length === 1 : ($('Glofox Webhook').item.json.body.Type === 'BOOKING_UPDATED' && $('Glofox Webhook').item.json.body.Payload.attended === false) ? $('Get Booking Count').item.json.data.filter(b => b.status !== 'CANCELED').length === 1 : false }}",
               "rightValue": true,
               "operator": {
                 "type": "boolean",
@@ -183,7 +183,7 @@
                       "type": "string",
                       "operation": "equals"
                     },
-                    "leftValue": "={{ $('Glofox Webhook').item.json.body.type }}",
+                    "leftValue": "={{ $('Glofox Webhook').item.json.body.Type }}",
                     "rightValue": "BOOKING_CREATED"
                   }
                 ],
@@ -207,7 +207,7 @@
                       "type": "string",
                       "operation": "equals"
                     },
-                    "leftValue": "={{ $('Glofox Webhook').item.json.body.type }}",
+                    "leftValue": "={{ $('Glofox Webhook').item.json.body.Type }}",
                     "rightValue": "BOOKING_DELETED"
                   }
                 ],
@@ -231,7 +231,7 @@
                       "type": "string",
                       "operation": "equals"
                     },
-                    "leftValue": "={{ $('Glofox Webhook').item.json.body.type }}",
+                    "leftValue": "={{ $('Glofox Webhook').item.json.body.Type }}",
                     "rightValue": "BOOKING_UPDATED"
                   },
                   {
@@ -241,7 +241,7 @@
                       "operation": "true",
                       "singleValue": true
                     },
-                    "leftValue": "={{ $('Glofox Webhook').item.json.body.payload.attended }}"
+                    "leftValue": "={{ $('Glofox Webhook').item.json.body.Payload.attended }}"
                   }
                 ],
                 "combinator": "and"
@@ -264,7 +264,7 @@
                       "type": "string",
                       "operation": "equals"
                     },
-                    "leftValue": "={{ $('Glofox Webhook').item.json.body.type }}",
+                    "leftValue": "={{ $('Glofox Webhook').item.json.body.Type }}",
                     "rightValue": "BOOKING_UPDATED"
                   },
                   {
@@ -274,7 +274,7 @@
                       "operation": "false",
                       "singleValue": true
                     },
-                    "leftValue": "={{ $('Glofox Webhook').item.json.body.payload.attended }}"
+                    "leftValue": "={{ $('Glofox Webhook').item.json.body.Payload.attended }}"
                   }
                 ],
                 "combinator": "and"
@@ -600,7 +600,7 @@
             },
             {
               "id": "user-present",
-              "leftValue": "={{ $('Glofox Webhook').item.json.body.payload.user_id }}",
+              "leftValue": "={{ $('Glofox Webhook').item.json.body.Payload.user_id }}",
               "rightValue": "",
               "operator": {
                 "type": "string",
@@ -626,7 +626,7 @@
       ],
       "parameters": {
         "errorType": "errorMessage",
-        "errorMessage": "=Unknown studio or bad input — Branch ID '{{ $('Glofox Webhook').item.json.body.metadata.location_id }}' not in the config sheet, or missing user_id '{{ $('Glofox Webhook').item.json.body.payload.user_id }}'."
+        "errorMessage": "=Unknown studio or bad input — Branch ID '{{ $('Glofox Webhook').item.json.body.Metadata.location_id }}' not in the config sheet, or missing user_id '{{ $('Glofox Webhook').item.json.body.Payload.user_id }}'."
       }
     }
   ],

@@ -31,7 +31,7 @@
           "conditions": [
             {
               "id": "attended-only",
-              "leftValue": "={{ $json.body.type === 'BOOKING_UPDATED' && $json.body.payload.attended === true }}",
+              "leftValue": "={{ $json.body.Type === 'BOOKING_UPDATED' && $json.body.Payload.attended === true }}",
               "rightValue": true,
               "operator": {
                 "type": "boolean",
@@ -90,7 +90,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Future-proof studio lookup: match + read columns BY POSITION (header-name-independent).\n// n8n's Google Sheets node prepends a 'row_number' field — drop it so positions line up with the sheet columns.\n// Column order: 0 Studio | 1 Branch ID | 2 API Key | 3 API Token | 4 GHL Location | 5 GHL PIT\nconst loc = String($('Glofox Webhook').first().json.body?.metadata?.location_id ?? '');\nfor (const row of $input.all()) {\n  const o = { ...row.json };\n  delete o.row_number;\n  const v = Object.values(o);\n  if (loc !== '' && String(v[1] ?? '') === loc) {\n    return [{ json: { studioName: v[0] ?? '', branchId: v[1] ?? '', apiKey: v[2] ?? '', apiToken: v[3] ?? '', ghlLocation: v[4] ?? '', ghlPit: v[5] ?? '', matched: true }, pairedItem: { item: 0 } }];\n  }\n}\nreturn [{ json: { branchId: '', apiKey: '', apiToken: '', ghlLocation: '', ghlPit: '', matched: false, locationId: loc }, pairedItem: { item: 0 } }];"
+        "jsCode": "// Future-proof studio lookup: match + read columns BY POSITION (header-name-independent).\n// n8n's Google Sheets node prepends a 'row_number' field — drop it so positions line up with the sheet columns.\n// Column order: 0 Studio | 1 Branch ID | 2 API Key | 3 API Token | 4 GHL Location | 5 GHL PIT\nconst loc = String($('Glofox Webhook').first().json.body?.Metadata?.location_id ?? '');\nfor (const row of $input.all()) {\n  const o = { ...row.json };\n  delete o.row_number;\n  const v = Object.values(o);\n  if (loc !== '' && String(v[1] ?? '') === loc) {\n    return [{ json: { studioName: v[0] ?? '', branchId: v[1] ?? '', apiKey: v[2] ?? '', apiToken: v[3] ?? '', ghlLocation: v[4] ?? '', ghlPit: v[5] ?? '', matched: true }, pairedItem: { item: 0 } }];\n  }\n}\nreturn [{ json: { branchId: '', apiKey: '', apiToken: '', ghlLocation: '', ghlPit: '', matched: false, locationId: loc }, pairedItem: { item: 0 } }];"
       },
       "id": "a1000000-0000-0000-0000-000000000007",
       "name": "Resolve Studio (by position)",
@@ -153,7 +153,7 @@
     },
     {
       "parameters": {
-        "url": "=https://gf-api.aws.glofox.com/prod/2.0/members/{{ $('Glofox Webhook').first().json.body.payload.user_id }}",
+        "url": "=https://gf-api.aws.glofox.com/prod/2.0/members/{{ $('Glofox Webhook').first().json.body.Payload.user_id }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -189,7 +189,7 @@
     },
     {
       "parameters": {
-        "url": "=https://gf-api.aws.glofox.com/prod/2.0/bookings?user_id={{ $('Glofox Webhook').first().json.body.payload.user_id }}&attended=true&status=BOOKED",
+        "url": "=https://gf-api.aws.glofox.com/prod/2.0/bookings?user_id={{ $('Glofox Webhook').first().json.body.Payload.user_id }}&attended=true&status=BOOKED",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [

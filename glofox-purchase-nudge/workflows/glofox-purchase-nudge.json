@@ -31,7 +31,7 @@
           "conditions": [
             {
               "id": "type-check",
-              "leftValue": "={{ $json.body.type }}",
+              "leftValue": "={{ $json.body.Type }}",
               "rightValue": "MEMBERSHIP_CREATED",
               "operator": {
                 "type": "string",
@@ -71,7 +71,7 @@
           "values": [
             {
               "lookupColumn": "Branch ID",
-              "lookupValue": "={{ ($('Glofox Webhook').item.json.body.metadata || {}).location_id || 'NO_BRANCH_ID' }}"
+              "lookupValue": "={{ ($('Glofox Webhook').item.json.body.Metadata || {}).location_id || 'NO_BRANCH_ID' }}"
             }
           ]
         },
@@ -95,7 +95,7 @@
     },
     {
       "parameters": {
-        "url": "=https://gf-api.aws.glofox.com/prod/2.0/members/{{ $('Glofox Webhook').item.json.body.payload.user_id }}",
+        "url": "=https://gf-api.aws.glofox.com/prod/2.0/members/{{ $('Glofox Webhook').item.json.body.Payload.user_id }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -145,7 +145,7 @@
     },
     {
       "parameters": {
-        "url": "=https://gf-api.aws.glofox.com/prod/2.0/bookings?user_id={{ $('Glofox Webhook').item.json.body.payload.user_id }}",
+        "url": "=https://gf-api.aws.glofox.com/prod/2.0/bookings?user_id={{ $('Glofox Webhook').item.json.body.Payload.user_id }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -320,7 +320,7 @@
             },
             {
               "id": "user-present",
-              "leftValue": "={{ $('Glofox Webhook').item.json.body.payload.user_id }}",
+              "leftValue": "={{ $('Glofox Webhook').item.json.body.Payload.user_id }}",
               "rightValue": "",
               "operator": {
                 "type": "string",
@@ -346,7 +346,7 @@
       ],
       "parameters": {
         "errorType": "errorMessage",
-        "errorMessage": "=Unknown studio or bad input — Branch ID '{{ $('Glofox Webhook').item.json.body.metadata.location_id }}' not in the config sheet, or missing user_id '{{ $('Glofox Webhook').item.json.body.payload.user_id }}'."
+        "errorMessage": "=Unknown studio or bad input — Branch ID '{{ $('Glofox Webhook').item.json.body.Metadata.location_id }}' not in the config sheet, or missing user_id '{{ $('Glofox Webhook').item.json.body.Payload.user_id }}'."
       }
     }
   ],

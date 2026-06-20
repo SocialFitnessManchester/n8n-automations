@@ -78,7 +78,7 @@
         0
       ],
       "parameters": {
-        "jsCode": "const ex = $input.first().json;\nlet data = ex.data;\nif (typeof data === 'string') { try { data = JSON.parse(data); } catch (e) { data = {}; } }\nlet locationId = null;\ntry {\n  const runData = (data && data.resultData && data.resultData.runData) || {};\n  const wh = runData['Glofox Webhook'];\n  const j = wh && wh[0] && wh[0].data && wh[0].data.main && wh[0].data.main[0] && wh[0].data.main[0][0] && wh[0].data.main[0][0].json;\n  const body = j && j.body;\n  locationId = (body && body.metadata && body.metadata.location_id) || null;\n} catch (e) { locationId = null; }\nreturn [{ json: { location_id: locationId } }];"
+        "jsCode": "const ex = $input.first().json;\nlet data = ex.data;\nif (typeof data === 'string') { try { data = JSON.parse(data); } catch (e) { data = {}; } }\nlet locationId = null;\ntry {\n  const runData = (data && data.resultData && data.resultData.runData) || {};\n  const wh = runData['Glofox Webhook'];\n  const j = wh && wh[0] && wh[0].data && wh[0].data.main && wh[0].data.main[0] && wh[0].data.main[0][0] && wh[0].data.main[0][0].json;\n  const body = j && j.body;\n  locationId = (body && body.Metadata && body.Metadata.location_id) || null;\n} catch (e) { locationId = null; }\nreturn [{ json: { location_id: locationId } }];"
       },
       "notes": "Pulls metadata.location_id (Branch ID) out of the failed execution's webhook payload. Handles string-or-object data and missing paths -> null."
     },

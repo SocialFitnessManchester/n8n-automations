@@ -39,7 +39,7 @@
           "conditions": [
             {
               "id": "c1",
-              "leftValue": "={{ $json.body.type }}",
+              "leftValue": "={{ $json.body.Type }}",
               "rightValue": "LEAD_CREATED",
               "operator": {
                 "type": "string",
@@ -80,7 +80,7 @@
           "values": [
             {
               "lookupColumn": "Branch ID",
-              "lookupValue": "={{ ($('Glofox Webhook').item.json.body.metadata || {}).location_id || 'NO_BRANCH_ID' }}"
+              "lookupValue": "={{ ($('Glofox Webhook').item.json.body.Metadata || {}).location_id || 'NO_BRANCH_ID' }}"
             }
           ]
         },
@@ -124,7 +124,7 @@
             },
             {
               "id": "lead-present",
-              "leftValue": "={{ $('Glofox Webhook').item.json.body.payload.lead_id }}",
+              "leftValue": "={{ $('Glofox Webhook').item.json.body.Payload.lead_id }}",
               "rightValue": "",
               "operator": {
                 "type": "string",
@@ -150,7 +150,7 @@
       ],
       "parameters": {
         "errorType": "errorMessage",
-        "errorMessage": "=Unknown studio or bad input — Branch ID '{{ $('Glofox Webhook').item.json.body.metadata.location_id }}' not in the config sheet, or missing lead_id '{{ $('Glofox Webhook').item.json.body.payload.lead_id }}'."
+        "errorMessage": "=Unknown studio or bad input — Branch ID '{{ $('Glofox Webhook').item.json.body.Metadata.location_id }}' not in the config sheet, or missing lead_id '{{ $('Glofox Webhook').item.json.body.Payload.lead_id }}'."
       }
     },
     {
@@ -163,7 +163,7 @@
         220
       ],
       "parameters": {
-        "url": "=https://gf-api.aws.glofox.com/prod/2.0/leads/{{ $('Glofox Webhook').item.json.body.payload.lead_id }}",
+        "url": "=https://gf-api.aws.glofox.com/prod/2.0/leads/{{ $('Glofox Webhook').item.json.body.Payload.lead_id }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -209,7 +209,7 @@
           "conditions": [
             {
               "id": "offer-present",
-              "leftValue": "={{ $('Glofox Webhook').item.json.body.payload.offer_name }}",
+              "leftValue": "={{ $('Glofox Webhook').item.json.body.Payload.offer_name }}",
               "rightValue": "",
               "operator": {
                 "type": "string",
@@ -253,7 +253,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"locationId\": \"JHgfCMprry4fxGOzRsYl\",\n  \"email\": \"{{ $('Get Lead Details').item.json.email }}\",\n  \"firstName\": \"{{ $('Get Lead Details').item.json.first_name }}\",\n  \"lastName\": \"{{ $('Get Lead Details').item.json.last_name }}\",\n  \"phone\": \"{{ $('Get Lead Details').item.json.phone }}\",\n  \"tags\": [\"new-lead\", \"lead-with-offer\"],\n  \"customFields\": [\n    {\n      \"key\": \"latest_offer_registered_for\",\n      \"field_value\": \"{{ $('Glofox Webhook').item.json.body.payload.offer_name }}\"\n    }\n  ]\n}",
+        "jsonBody": "={\n  \"locationId\": \"JHgfCMprry4fxGOzRsYl\",\n  \"email\": \"{{ $('Get Lead Details').item.json.email }}\",\n  \"firstName\": \"{{ $('Get Lead Details').item.json.first_name }}\",\n  \"lastName\": \"{{ $('Get Lead Details').item.json.last_name }}\",\n  \"phone\": \"{{ $('Get Lead Details').item.json.phone }}\",\n  \"tags\": [\"new-lead\", \"lead-with-offer\"],\n  \"customFields\": [\n    {\n      \"key\": \"latest_offer_registered_for\",\n      \"field_value\": \"{{ $('Glofox Webhook').item.json.body.Payload.offer_name }}\"\n    }\n  ]\n}",
         "options": {}
       },
       "credentials": {
