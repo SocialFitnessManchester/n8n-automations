@@ -39,7 +39,7 @@
           "conditions": [
             {
               "id": "c1",
-              "leftValue": "={{ $json.body.type }}",
+              "leftValue": "={{ $json.body.Type }}",
               "rightValue": "MEMBERSHIP_CREATED",
               "operator": {
                 "type": "string",
@@ -80,7 +80,7 @@
           "values": [
             {
               "lookupColumn": "Branch ID",
-              "lookupValue": "={{ ($('Glofox Webhook').item.json.body.metadata || {}).location_id || 'NO_BRANCH_ID' }}"
+              "lookupValue": "={{ ($('Glofox Webhook').item.json.body.Metadata || {}).location_id || 'NO_BRANCH_ID' }}"
             }
           ]
         },
@@ -104,7 +104,7 @@
         300
       ],
       "parameters": {
-        "url": "=https://gf-api.aws.glofox.com/prod/2.0/members/{{ $('Glofox Webhook').item.json.body.payload.user_id }}",
+        "url": "=https://gf-api.aws.glofox.com/prod/2.0/members/{{ $('Glofox Webhook').item.json.body.Payload.user_id }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -159,7 +159,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"locationId\": \"JHgfCMprry4fxGOzRsYl\",\n  \"email\": \"{{ $('Get Member Email').item.json.email }}\",\n  \"firstName\": \"{{ $('Get Member Email').item.json.first_name }}\",\n  \"lastName\": \"{{ $('Get Member Email').item.json.last_name }}\",\n  \"phone\": \"{{ $('Get Member Email').item.json.metadata && $('Get Member Email').item.json.metadata.twilio ? $('Get Member Email').item.json.metadata.twilio.phone_number : $('Get Member Email').item.json.phone }}\",\n  \"tags\": [\"trial-purchase\"],\n  \"customFields\": [\n    {\n      \"key\": \"latest_offer_registered_for\",\n      \"field_value\": \"{{ $('Glofox Webhook').item.json.body.payload.membership_definition.plan_name }}\"\n    }\n  ]\n}",
+        "jsonBody": "={\n  \"locationId\": \"JHgfCMprry4fxGOzRsYl\",\n  \"email\": \"{{ $('Get Member Email').item.json.email }}\",\n  \"firstName\": \"{{ $('Get Member Email').item.json.first_name }}\",\n  \"lastName\": \"{{ $('Get Member Email').item.json.last_name }}\",\n  \"phone\": \"{{ $('Get Member Email').item.json.metadata && $('Get Member Email').item.json.metadata.twilio ? $('Get Member Email').item.json.metadata.twilio.phone_number : $('Get Member Email').item.json.phone }}\",\n  \"tags\": [\"trial-purchase\"],\n  \"customFields\": [\n    {\n      \"key\": \"latest_offer_registered_for\",\n      \"field_value\": \"{{ $('Glofox Webhook').item.json.body.Payload.membership_definition.plan_name }}\"\n    }\n  ]\n}",
         "options": {}
       },
       "credentials": {
@@ -200,7 +200,7 @@
             },
             {
               "id": "user-present",
-              "leftValue": "={{ $('Glofox Webhook').item.json.body.payload.user_id }}",
+              "leftValue": "={{ $('Glofox Webhook').item.json.body.Payload.user_id }}",
               "rightValue": "",
               "operator": {
                 "type": "string",
@@ -226,7 +226,7 @@
       ],
       "parameters": {
         "errorType": "errorMessage",
-        "errorMessage": "=Unknown studio or bad input — Branch ID '{{ $('Glofox Webhook').item.json.body.metadata.location_id }}' not in the config sheet, or missing user_id '{{ $('Glofox Webhook').item.json.body.payload.user_id }}'."
+        "errorMessage": "=Unknown studio or bad input — Branch ID '{{ $('Glofox Webhook').item.json.body.Metadata.location_id }}' not in the config sheet, or missing user_id '{{ $('Glofox Webhook').item.json.body.Payload.user_id }}'."
       }
     }
   ],
