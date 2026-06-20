@@ -303,6 +303,28 @@
         }
       },
       "notes": "General-enquiry branch: upsert + tags ['new-lead','general-enquiry']. Deliberately NO customFields — so we don't blank out an offer that was already captured from another source (FB lead ad / form). ⚠️ Hardcoded test location + PIT (move to sheet, see #13). Tag names are placeholders."
+    },
+    {
+      "id": "save-branch-filter",
+      "name": "Save Branch ID (filter)",
+      "type": "n8n-nodes-base.executionData",
+      "typeVersion": 1.1,
+      "position": [
+        -880,
+        300
+      ],
+      "parameters": {
+        "operation": "save",
+        "dataToSave": {
+          "values": [
+            {
+              "key": "location_id",
+              "value": "={{ $json.body.Metadata.location_id }}"
+            }
+          ]
+        }
+      },
+      "notes": "Saves the studio Branch ID as highlighted execution data so runs are filterable per-studio in the Executions list."
     }
   ],
   "connections": {
@@ -310,7 +332,7 @@
       "main": [
         [
           {
-            "node": "Only New Leads",
+            "node": "Save Branch ID (filter)",
             "type": "main",
             "index": 0
           }
@@ -380,6 +402,17 @@
         [
           {
             "node": "GHL: Upsert Contact (General)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Branch ID (filter)": {
+      "main": [
+        [
+          {
+            "node": "Only New Leads",
             "type": "main",
             "index": 0
           }

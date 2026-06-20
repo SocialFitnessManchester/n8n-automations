@@ -628,6 +628,28 @@
         "errorType": "errorMessage",
         "errorMessage": "=Unknown studio or bad input — Branch ID '{{ $('Glofox Webhook').item.json.body.Metadata.location_id }}' not in the config sheet, or missing user_id '{{ $('Glofox Webhook').item.json.body.Payload.user_id }}'."
       }
+    },
+    {
+      "id": "save-branch-filter",
+      "name": "Save Branch ID (filter)",
+      "type": "n8n-nodes-base.executionData",
+      "typeVersion": 1.1,
+      "position": [
+        -1016,
+        208
+      ],
+      "parameters": {
+        "operation": "save",
+        "dataToSave": {
+          "values": [
+            {
+              "key": "location_id",
+              "value": "={{ $json.body.Metadata.location_id }}"
+            }
+          ]
+        }
+      },
+      "notes": "Saves the studio Branch ID as highlighted execution data so runs are filterable per-studio in the Executions list."
     }
   ],
   "connections": {
@@ -635,7 +657,7 @@
       "main": [
         [
           {
-            "node": "Lookup Studio Config",
+            "node": "Save Branch ID (filter)",
             "type": "main",
             "index": 0
           }
@@ -764,6 +786,17 @@
         [
           {
             "node": "Unknown Studio / Bad Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Branch ID (filter)": {
+      "main": [
+        [
+          {
+            "node": "Lookup Studio Config",
             "type": "main",
             "index": 0
           }
