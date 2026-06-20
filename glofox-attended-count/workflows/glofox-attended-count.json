@@ -139,20 +139,6 @@
     },
     {
       "parameters": {
-        "errorType": "errorMessage",
-        "errorMessage": "=Unknown studio or bad input — no row in the studio config sheet matches Branch ID '{{ $('Resolve Studio (by position)').item.json.locationId }}'."
-      },
-      "id": "a1000000-0000-0000-0000-000000000009",
-      "name": "Unknown Studio / Bad Input",
-      "type": "n8n-nodes-base.stopAndError",
-      "typeVersion": 1,
-      "position": [
-        -144,
-        480
-      ]
-    },
-    {
-      "parameters": {
         "url": "=https://gf-api.aws.glofox.com/prod/2.0/members/{{ $('Glofox Webhook').first().json.body.Payload.user_id }}",
         "sendHeaders": true,
         "headerParameters": {
@@ -336,13 +322,7 @@
             "index": 0
           }
         ],
-        [
-          {
-            "node": "Unknown Studio / Bad Input",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        []
       ]
     },
     "Get Member": {
