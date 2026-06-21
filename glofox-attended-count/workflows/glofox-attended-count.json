@@ -5,7 +5,6 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "glofox-attended-count",
-        "responseMode": "onReceived",
         "options": {}
       },
       "id": "a1000000-0000-0000-0000-000000000001",
@@ -56,41 +55,7 @@
     },
     {
       "parameters": {
-        "authentication": "serviceAccount",
-        "documentId": {
-          "__rl": true,
-          "value": "10JeveuIeXNGsGyDQD5dvFLKzOoOzIN8ffRwszGuu2XA",
-          "mode": "id",
-          "cachedResultName": "Glofox to GHL - Studio Config"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "gid=0",
-          "mode": "list",
-          "cachedResultName": "Sheet1"
-        },
-        "options": {}
-      },
-      "id": "a1000000-0000-0000-0000-000000000006",
-      "name": "Lookup Studio Config",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.7,
-      "position": [
-        -624,
-        304
-      ],
-      "credentials": {
-        "googleApi": {
-          "id": "PvDoggN1HExofTc3",
-          "name": "Google Service Account account"
-        }
-      },
-      "alwaysOutputData": true,
-      "notes": "Reads ALL rows of the studio config sheet (no name-based filter); matching is done by the next node by column POSITION — future-proof against header renames."
-    },
-    {
-      "parameters": {
-        "jsCode": "// Future-proof studio lookup: match + read columns BY POSITION (header-name-independent).\n// n8n's Google Sheets node prepends a 'row_number' field — drop it so positions line up with the sheet columns.\n// Column order: 0 Studio | 1 Branch ID | 2 API Key | 3 API Token | 4 GHL Location | 5 GHL PIT\nconst loc = String($('Glofox Webhook').first().json.body?.Metadata?.location_id ?? '');\nfor (const row of $input.all()) {\n  const o = { ...row.json };\n  delete o.row_number;\n  const v = Object.values(o);\n  if (loc !== '' && String(v[1] ?? '') === loc) {\n    return [{ json: { studioName: v[0] ?? '', branchId: v[1] ?? '', apiKey: v[2] ?? '', apiToken: v[3] ?? '', ghlLocation: v[4] ?? '', ghlPit: v[5] ?? '', matched: true }, pairedItem: { item: 0 } }];\n  }\n}\nreturn [{ json: { branchId: '', apiKey: '', apiToken: '', ghlLocation: '', ghlPit: '', matched: false, locationId: loc }, pairedItem: { item: 0 } }];"
+        "jsCode": "// Map the cached studio row (from the 'Lookup Studio (cache)' Data Table node)\n// to the stable camelCase names the downstream nodes already use.\n// The Data Table already matched on branch_id, so this just renames fields.\nconst r = $input.first().json;\nreturn [{ json: {\n  branchId: String(r.branch_id ?? ''),\n  studioName: String(r.studio_name ?? ''),\n  apiKey: String(r.api_key ?? ''),\n  apiToken: String(r.api_token ?? ''),\n  ghlLocation: String(r.ghl_location ?? ''),\n  ghlPit: String(r.ghl_pit ?? ''),\n  matched: true\n}, pairedItem: { item: 0 } }];"
       },
       "id": "a1000000-0000-0000-0000-000000000007",
       "name": "Resolve Studio (by position)",
@@ -100,7 +65,7 @@
         -384,
         304
       ],
-      "notes": "Matches the webhook branch (metadata.location_id) against the sheet Branch ID column BY POSITION and exposes branchId/apiKey/apiToken/ghlLocation/ghlPit under stable names. Drops n8n's row_number first. Header renames don't break it. Empty branchId if no match -> guard stops it."
+      "notes": "Maps the cached studio row (from 'Lookup Studio (cache)') to the stable camelCase names the downstream nodes use. Replaces the old sheet-by-position scan."
     },
     {
       "parameters": {
@@ -171,7 +136,7 @@
         96,
         304
       ],
-      "notes": "Member lookup for email. Glofox creds pulled dynamically from the studio sheet (by position) — was hardcoded."
+      "notes": "Looks up the member by user_id to get email. Glofox creds now pulled dynamically from the studio sheet (by position) — was hardcoded."
     },
     {
       "parameters": {
@@ -207,7 +172,7 @@
         336,
         304
       ],
-      "notes": "Counts attended, non-cancelled classes -> total_count. Glofox creds pulled dynamically from the studio sheet (by position)."
+      "notes": "Counts attended, non-cancelled classes: ?attended=true&status=BOOKED -> read total_count. Glofox creds now pulled dynamically from the studio sheet (by position)."
     },
     {
       "parameters": {
@@ -243,19 +208,10 @@
         576,
         304
       ],
-      "notes": "Writes total_count to GHL custom field 'glofox_class_attendance'. GHL locationId + PIT pulled from the studio sheet by position (col 4 / col 5). NOTE: needs the branch's sheet row to hold GHL Location/PIT in those columns; a duplicate row without them will 401 (see #13)."
+      "notes": "Writes attended total_count to GHL custom field 'glofox_class_attendance'. GHL locationId + PIT now pulled dynamically from the studio sheet (by position: GHL Location=col 4, GHL PIT=col 5) — was hardcoded."
     },
     {
-      "id": "save-branch-filter",
-      "name": "Save Branch ID (filter)",
-      "type": "n8n-nodes-base.executionData",
-      "typeVersion": 1.1,
-      "position": [
-        -984,
-        304
-      ],
       "parameters": {
-        "operation": "save",
         "dataToSave": {
           "values": [
             {
@@ -265,7 +221,48 @@
           ]
         }
       },
-      "notes": "Saves the studio Branch ID as highlighted execution data so runs are filterable per-studio in the Executions list."
+      "id": "89a8c368-8343-432e-8a0a-7cfeed6f0c4e",
+      "name": "Save Branch ID (filter)",
+      "type": "n8n-nodes-base.executionData",
+      "typeVersion": 1.1,
+      "position": [
+        -992,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Ba4cRH8IzwZG9WqJ",
+          "cachedResultName": "studio_config"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "branch_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Glofox Webhook').first().json.body.Metadata.location_id }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1,
+        "options": {}
+      },
+      "id": "01f94c94-95bb-40df-b2d7-445b6dc46f68",
+      "name": "Lookup Studio (cache)",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -624,
+        304
+      ],
+      "notes": "Cache lookup: fetch the studio row from the studio_config Data Table by branch_id (=location_id). Replaces the per-event Google Sheets read (see #19). No match -> 0 items -> workflow halts silently."
     }
   ],
   "connections": {
@@ -284,18 +281,7 @@
       "main": [
         [
           {
-            "node": "Lookup Studio Config",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Lookup Studio Config": {
-      "main": [
-        [
-          {
-            "node": "Resolve Studio (by position)",
+            "node": "Lookup Studio (cache)",
             "type": "main",
             "index": 0
           }
@@ -321,8 +307,7 @@
             "type": "main",
             "index": 0
           }
-        ],
-        []
+        ]
       ]
     },
     "Get Member": {
@@ -352,6 +337,17 @@
         [
           {
             "node": "Only Attended Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Studio (cache)": {
+      "main": [
+        [
+          {
+            "node": "Resolve Studio (by position)",
             "type": "main",
             "index": 0
           }

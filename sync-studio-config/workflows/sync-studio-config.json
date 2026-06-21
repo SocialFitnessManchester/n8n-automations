@@ -1,0 +1,249 @@
+{
+  "name": "Sync Studio Config → Data Table",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "sched",
+      "name": "Every 15 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -640,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "refresh-studio-config",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "id": "hook",
+      "name": "Refresh Now (instant)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -640,
+        320
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "d91QWUzduSiduAaJ",
+          "name": "Studio Config Refresh Secret"
+        }
+      },
+      "webhookId": "refresh-studio-config",
+      "notes": "Instant refresh: ping this from the sheet's Apps Script onChange trigger when a studio is added/edited. Secure with a token before relying on it."
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "documentId": {
+          "__rl": true,
+          "value": "10JeveuIeXNGsGyDQD5dvFLKzOoOzIN8ffRwszGuu2XA",
+          "mode": "id",
+          "cachedResultName": "Glofox to GHL - Studio Config"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "options": {}
+      },
+      "id": "read",
+      "name": "Read Studio Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -380,
+        220
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "PvDoggN1HExofTc3",
+          "name": "Google Service Account account"
+        }
+      },
+      "notes": "Reads ALL rows once per run (1 Sheets read per sync, not per event)."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Map sheet rows to the studio_config schema BY POSITION (future-proof vs header renames).\n// Drop n8n's row_number so positions line up: 0 Studio | 1 Branch ID | 2 API Key | 3 API Token | 4 GHL Location | 5 GHL PIT\n// Dedupe by Branch ID keeping the FIRST occurrence — matches the live 'first match wins' lookup and the sheet-ordering workaround for duplicate rows.\nconst out = [];\nconst seen = new Set();\nfor (const item of $input.all()) {\n  const o = { ...item.json };\n  delete o.row_number;\n  const v = Object.values(o);\n  const branchId = String(v[1] ?? '').trim();\n  if (!branchId) continue; // skip rows without a Branch ID\n  if (seen.has(branchId)) continue; // keep first occurrence\n  seen.add(branchId);\n  out.push({ json: {\n    branch_id: branchId,\n    studio_name: String(v[0] ?? ''),\n    api_key: String(v[2] ?? ''),\n    api_token: String(v[3] ?? ''),\n    ghl_location: String(v[4] ?? ''),\n    ghl_pit: String(v[5] ?? '')\n  }});\n}\nreturn out;"
+      },
+      "id": "map",
+      "name": "Map Rows by Position",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -140,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "row",
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "value": "Ba4cRH8IzwZG9WqJ",
+          "mode": "id",
+          "cachedResultName": "studio_config"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "branch_id"
+          ],
+          "value": {
+            "branch_id": "={{ $json.branch_id }}",
+            "studio_name": "={{ $json.studio_name }}",
+            "api_key": "={{ $json.api_key }}",
+            "api_token": "={{ $json.api_token }}",
+            "ghl_location": "={{ $json.ghl_location }}",
+            "ghl_pit": "={{ $json.ghl_pit }}"
+          },
+          "schema": [
+            {
+              "id": "branch_id",
+              "displayName": "branch_id",
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "id": "studio_name",
+              "displayName": "studio_name",
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "id": "api_key",
+              "displayName": "api_key",
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "id": "api_token",
+              "displayName": "api_token",
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "id": "ghl_location",
+              "displayName": "ghl_location",
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "id": "ghl_pit",
+              "displayName": "ghl_pit",
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {},
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "branch_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.branch_id }}"
+            }
+          ]
+        }
+      },
+      "id": "upsert",
+      "name": "Upsert to studio_config",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        120,
+        220
+      ]
+    }
+  ],
+  "connections": {
+    "Every 15 min": {
+      "main": [
+        [
+          {
+            "node": "Read Studio Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Refresh Now (instant)": {
+      "main": [
+        [
+          {
+            "node": "Read Studio Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Studio Sheet": {
+      "main": [
+        [
+          {
+            "node": "Map Rows by Position",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map Rows by Position": {
+      "main": [
+        [
+          {
+            "node": "Upsert to studio_config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "AKbzN48d9DQwMioQ"
+  },
+  "active": false
+}

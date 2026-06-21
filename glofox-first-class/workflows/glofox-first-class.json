@@ -5,7 +5,6 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "glofox-first-class-test",
-        "responseMode": "onReceived",
         "options": {}
       },
       "id": "035e8795-3fd5-4616-977a-87a806172f89",
@@ -21,47 +20,6 @@
     },
     {
       "parameters": {
-        "authentication": "serviceAccount",
-        "documentId": {
-          "__rl": true,
-          "value": "10JeveuIeXNGsGyDQD5dvFLKzOoOzIN8ffRwszGuu2XA",
-          "mode": "id",
-          "cachedResultName": "Glofox to GHL - Studio Config"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "gid=0",
-          "mode": "list",
-          "cachedResultName": "Sheet1"
-        },
-        "filtersUI": {
-          "values": [
-            {
-              "lookupColumn": "Branch ID",
-              "lookupValue": "={{ ($('Glofox Webhook').item.json.body.Metadata || {}).location_id || 'NO_BRANCH_ID' }}"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "46b9da83-4d19-46be-8286-c01edf63eea9",
-      "name": "Lookup Studio Config",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.7,
-      "position": [
-        -688,
-        208
-      ],
-      "credentials": {
-        "googleApi": {
-          "id": "PvDoggN1HExofTc3",
-          "name": "Google Service Account account"
-        }
-      },
-      "alwaysOutputData": true
-    },
-    {
-      "parameters": {
         "url": "=https://gf-api.aws.glofox.com/prod/2.0/members/{{ $('Glofox Webhook').item.json.body.Payload.user_id }}",
         "sendHeaders": true,
         "headerParameters": {
@@ -72,15 +30,15 @@
             },
             {
               "name": "x-api-key",
-              "value": "={{ $('Lookup Studio Config').item.json['API Key'] }}"
+              "value": "={{ $('Lookup Studio (cache)').item.json.api_key }}"
             },
             {
               "name": "x-glofox-api-token",
-              "value": "={{ $('Lookup Studio Config').item.json['API Token'] }}"
+              "value": "={{ $('Lookup Studio (cache)').item.json.api_token }}"
             },
             {
               "name": "x-glofox-branch-id",
-              "value": "={{ $('Lookup Studio Config').item.json['Branch ID'] }}"
+              "value": "={{ $('Lookup Studio (cache)').item.json.branch_id }}"
             }
           ]
         },
@@ -107,15 +65,15 @@
             },
             {
               "name": "x-api-key",
-              "value": "={{ $('Lookup Studio Config').item.json['API Key'] }}"
+              "value": "={{ $('Lookup Studio (cache)').item.json.api_key }}"
             },
             {
               "name": "x-glofox-api-token",
-              "value": "={{ $('Lookup Studio Config').item.json['API Token'] }}"
+              "value": "={{ $('Lookup Studio (cache)').item.json.api_token }}"
             },
             {
               "name": "x-glofox-branch-id",
-              "value": "={{ $('Lookup Studio Config').item.json['Branch ID'] }}"
+              "value": "={{ $('Lookup Studio (cache)').item.json.branch_id }}"
             }
           ]
         },
@@ -325,7 +283,7 @@
       "typeVersion": 4.4,
       "position": [
         416,
-        0
+        -80
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -364,7 +322,7 @@
       "typeVersion": 4.4,
       "position": [
         416,
-        224
+        160
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -402,8 +360,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        640,
-        224
+        624,
+        160
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -442,7 +400,7 @@
       "typeVersion": 4.4,
       "position": [
         416,
-        448
+        368
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -480,8 +438,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        640,
-        448
+        672,
+        384
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -519,8 +477,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        416,
-        672
+        400,
+        592
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -559,8 +517,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        640,
-        672
+        624,
+        592
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -571,26 +529,18 @@
       "notes": "Mirrors the attended branch: removes first-class-booked after tagging no-show."
     },
     {
-      "id": "fc-guard-if",
-      "name": "Studio In Sheet?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [
-        -576,
-        208
-      ],
       "parameters": {
         "conditions": {
           "options": {
             "version": 3,
             "leftValue": "",
             "caseSensitive": true,
-            "typeValidation": "loose"
+            "typeValidation": "strict"
           },
           "conditions": [
             {
               "id": "studio-found",
-              "leftValue": "={{ $('Lookup Studio Config').item.json['Branch ID'] }}",
+              "leftValue": "={{ $('Lookup Studio (cache)').item.json.branch_id }}",
               "rightValue": "",
               "operator": {
                 "type": "string",
@@ -613,19 +563,18 @@
         },
         "options": {}
       },
+      "id": "fc-guard-if",
+      "name": "Studio In Sheet?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -672,
+        224
+      ],
       "notes": "Guard: only continue if the branch was found in the sheet AND a user_id is present. Otherwise -> Stop and Error (loud alert) instead of silently halting."
     },
     {
-      "id": "save-branch-filter",
-      "name": "Save Branch ID (filter)",
-      "type": "n8n-nodes-base.executionData",
-      "typeVersion": 1.1,
-      "position": [
-        -1016,
-        208
-      ],
       "parameters": {
-        "operation": "save",
         "dataToSave": {
           "values": [
             {
@@ -635,7 +584,48 @@
           ]
         }
       },
-      "notes": "Saves the studio Branch ID as highlighted execution data so runs are filterable per-studio in the Executions list."
+      "id": "23d13efb-9f9b-4716-87db-b666e1de71f6",
+      "name": "Save Branch ID (filter)",
+      "type": "n8n-nodes-base.executionData",
+      "typeVersion": 1.1,
+      "position": [
+        -992,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Ba4cRH8IzwZG9WqJ",
+          "cachedResultName": "studio_config"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "branch_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Glofox Webhook').item.json.body.Metadata.location_id }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1,
+        "options": {}
+      },
+      "id": "dccc752c-83a6-4f0e-960f-6774ec9f175f",
+      "name": "Lookup Studio (cache)",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -848,
+        208
+      ],
+      "notes": "Cache lookup: studio row from the studio_config Data Table by branch_id (=location_id). Replaces the per-event Google Sheets read (see #19). No match -> 0 items -> halts silently."
     }
   ],
   "connections": {
@@ -680,8 +670,7 @@
             "type": "main",
             "index": 0
           }
-        ],
-        []
+        ]
       ]
     },
     "Branch by Status": {
@@ -749,17 +738,6 @@
         ]
       ]
     },
-    "Lookup Studio Config": {
-      "main": [
-        [
-          {
-            "node": "Studio In Sheet?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Studio In Sheet?": {
       "main": [
         [
@@ -768,15 +746,25 @@
             "type": "main",
             "index": 0
           }
-        ],
-        []
+        ]
       ]
     },
     "Save Branch ID (filter)": {
       "main": [
         [
           {
-            "node": "Lookup Studio Config",
+            "node": "Lookup Studio (cache)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Studio (cache)": {
+      "main": [
+        [
+          {
+            "node": "Studio In Sheet?",
             "type": "main",
             "index": 0
           }
