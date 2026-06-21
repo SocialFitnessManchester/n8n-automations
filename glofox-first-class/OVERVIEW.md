@@ -44,12 +44,21 @@ The workflow uses two credentials, both configured in n8n's Credentials UI:
 
 | Credential | Type | What it does |
 |---|---|---|
-| `Google Service Account account` | Google Service Account | Reads the studio config Google Sheet. The service account email is shared on the sheet with Viewer access. |
+| `Google Service Account account` | Google Service Account | Reads the studio config Google Sheet. The service account email is shared on the sheet with Viewer access. Used by the **Sync Studio Config → Data Table** workflow (which reads the sheet once per sync), not by the per-event webhook flow. |
 | `HighLevel PIT - Test Sub Account` | HTTP Header Auth | `Authorization: Bearer pit-...` — talks to HighLevel V2 API on behalf of one GHL sub-account. One credential per sub-account. |
 
 Why two different auth methods? Because:
 - **Google Sheets** uses OAuth2 / service accounts — service accounts are best for unattended workflows.
 - **GHL** has moved away from the legacy V1 API key. The modern path is either OAuth2 (which requires building a marketplace app) or **Private Integration Tokens** (PIT). PIT is per-sub-account, simpler to set up, and works perfectly for our use case.
+
+### 2.5 Studio config cache (Data Table)
+
+The webhook workflows no longer read the studio config Google Sheet on every event. At high volume (~79k events in 24h) that hit Google's Sheets read quota (~60 read-requests/min/user) and failed with HTTP 429 ("too many requests"). The fix (GitHub issue #19, now closed) introduces an internal cache:
+
+- **`studio_config` Data Table** (n8n's built-in Data Table feature) holds one row per branch, with columns `branch_id` (key), `studio_name`, `api_key`, `api_token`, `ghl_location`, `ghl_pit`. The webhook flow's **"Lookup Studio (cache)"** node does a Data Table "Get row" by `branch_id` — an internal DB lookup with no external rate limit.
+- A separate **"Sync Studio Config → Data Table"** workflow (n8n id `mKrkdoAQ85WCZiJF`; repo folder [`../sync-studio-config/`](../sync-studio-config/)) keeps the table in sync with the Google Sheet. It reads the sheet **once per run** and upserts into the Data Table, on a **15-minute schedule** plus an **instant refresh** path: a secured webhook `POST /webhook/refresh-studio-config` (Header-Auth secret) fired by an installable Apps Script `onChange` trigger on the sheet, so edits propagate immediately.
+
+The Google Sheet stays the human-editable source of truth — it's just read once per sync rather than once per event.
 
 ---
 
@@ -63,12 +72,15 @@ When a member books, cancels, or attends what amounts to their first class at a 
 
 ```mermaid
 flowchart TD
-    A[Glofox Webhook<br/>BOOKING_CREATED, BOOKING_DELETED, BOOKING_UPDATED] --> B[Lookup Studio Config<br/>Google Sheets row by Branch ID<br/>returns API Key + API Token]
-    B --> C[Get Member Email<br/>GET /members/:user_id from Glofox]
+    A[Glofox Webhook<br/>BOOKING_CREATED, BOOKING_DELETED, BOOKING_UPDATED] --> A2[Save Branch ID<br/>highlight location_id as execution data]
+    A2 --> B[Lookup Studio cache<br/>Data Table Get by Branch ID<br/>returns API Key + API Token]
+    B --> B2{Studio In Sheet?}
+    B2 -->|No| Z2[Stop silently]
+    B2 -->|Yes| C[Get Member Email<br/>GET /members/:user_id from Glofox]
     C --> D[Get Booking Count<br/>GET /bookings?user_id= from Glofox]
     D --> E{Is First Class<br/>Event?}
     E -->|No| Z[Stop]
-    E -->|Yes| F{Switch by<br/>payload.status}
+    E -->|Yes| F{Switch by<br/>Payload.status}
     F -->|BOOKED| G[GHL upsert contact<br/>+ add first-class-booked tag]
     F -->|CANCELED| H[GHL upsert contact<br/>+ add first-class-cancelled tag]
     H --> I[GHL DELETE<br/>first-class-booked tag]
@@ -82,9 +94,11 @@ Failures on any node route to the shared **Error Handler** workflow (`AKbzN48d9D
 
 ### 3.3 Step-by-step
 
-1. **Glofox webhook fires** when a booking is created, deleted, or updated. The top-level `type` field tells you the event kind (`BOOKING_CREATED` / `BOOKING_DELETED` / `BOOKING_UPDATED`); for `BOOKING_UPDATED` the `payload.attended` boolean distinguishes an attendance (`true`) from a no-show (`false`). We route on `type` + `payload.attended`.
+1. **Glofox webhook fires** when a booking is created, deleted, or updated. The webhook payload's top-level keys are **PascalCase** — `Type`, `Metadata`, `Payload` — while nested keys (`location_id`, `user_id`, `attended`, etc.) stay lowercase. The top-level `Type` field tells you the event kind (`BOOKING_CREATED` / `BOOKING_DELETED` / `BOOKING_UPDATED`); for `BOOKING_UPDATED` the `Payload.attended` boolean distinguishes an attendance (`true`) from a no-show (`false`). We route on `Type` + `Payload.attended`. (Earlier docs/code used lowercase top-level keys.)
 
-2. **Studio config lookup (Google Sheets).** The webhook payload includes a `metadata.location_id`, which we match against the **Branch ID** column in [this sheet](https://docs.google.com/spreadsheets/d/10JeveuIeXNGsGyDQD5dvFLKzOoOzIN8ffRwszGuu2XA/edit). The row gives us the Glofox API Key + Token for that branch. Storing creds in a sheet (rather than hard-coded in n8n) means non-technical staff can add new studios by adding a row.
+   Immediately after the webhook, a **"Save Branch ID (filter)"** Execution Data node saves `Metadata.location_id` as highlighted execution data, so runs are filterable per-studio in the Executions list.
+
+2. **Studio config lookup (Data Table cache).** The webhook payload includes a `Metadata.location_id`, which the **"Lookup Studio (cache)"** node matches against the **`branch_id`** key column of the n8n **Data Table** `studio_config` (a "Get row" where `branch_id == Metadata.location_id`). The row gives us the Glofox API Key + Token for that branch. This is an internal DB lookup with **no external rate limit** — it replaced a direct per-event read of the Google Sheet, which hit Google's Sheets read quota (~60 requests/min/user) and failed with HTTP 429 under high volume (~79k events in 24h; see [§2.5](#25-studio-config-cache-data-table) and GitHub issue #19). The downstream **`Studio In Sheet?`** guard halts the run silently when no row is returned (unknown studio); the old "Unknown Studio / Bad Input" Stop & Error guard that used to alert on this has been removed.
 
 3. **Get member details from Glofox** — calls `GET /prod/2.0/members/{user_id}` to retrieve email, first name, last name, phone, and consent fields. This is what gets pushed to GHL.
 
@@ -110,7 +124,7 @@ Failures on any node route to the shared **Error Handler** workflow (`AKbzN48d9D
 
 - **Marketing consent.** We default to "yes" — we don't read Glofox's `consent.email.active` block and don't set GHL's DND flags. Reason: anyone reaching this point has already consented at the Glofox booking step upstream. Re-validating would just add complexity.
 
-- **One workflow per studio (for now).** Each studio has its own n8n workflow with a hardcoded GHL Location ID and a dedicated PIT credential. This mirrors the Zapier pattern (one Zap per studio) and was the fastest way to ship. The long-term play is one master workflow that picks the GHL location dynamically from the sheet — but it requires the GHL Location ID and PIT to also live in the sheet, and changes to how credentials are referenced.
+- **One workflow per studio (for now).** Each studio has its own n8n workflow with a hardcoded GHL Location ID and a dedicated PIT credential. This mirrors the Zapier pattern (one Zap per studio) and was the fastest way to ship. The long-term play is one master workflow that picks the GHL location dynamically from the `studio_config` cache (whose `ghl_location` / `ghl_pit` columns already exist) — but it requires rewiring how the GHL nodes reference credentials.
 
 - **Webhook URLs require Glofox staff to register them.** Every new endpoint = a Glofox support ticket. This argues against having dozens of webhook URLs (one per studio per event) and pushes us toward consolidation — but it's a tradeoff we'll revisit.
 
@@ -120,18 +134,22 @@ Failures on any node route to the shared **Error Handler** workflow (`AKbzN48d9D
 
 ## 4. Current state per branch
 
+The workflow is **ACTIVE** and running on the Data Table cache. Since the cutover to the cache (issue #19), it has handled live traffic with **zero HTTP 429 errors**.
+
 | Branch | Status | Notes |
 |---|---|---|
-| **First class booked** | ✅ Working | Tested end-to-end on test sub-account. Contact created in GHL with name, email, phone, and tag in a single API call. |
-| **First class cancelled** | ✅ Working | Tested end-to-end. Adds `first-class-cancelled` tag, removes `first-class-booked`. |
-| **First class attended** | ✅ Working | Tested end-to-end via synthetic payload (Glofox is now firing `BOOKING_UPDATED` with `payload.attended: true` to signal attendance — `payload.status` stays `BOOKED`). Adds `first-class-attended` tag, removes `first-class-booked`. |
-| **First class no-show** | 🟡 Built, pending go-live | Fires on `BOOKING_UPDATED` + `payload.attended: false`. Adds `first-class-no-show` tag, removes `first-class-booked` (mirrors the attended branch). Tag name and hardcoded test location are placeholders to confirm before go-live. |
+| **First class booked** | ✅ Working | Tested end-to-end on live data. Contact created in GHL with name, email, phone, and tag in a single API call. |
+| **First class cancelled** | ✅ Working | Tested end-to-end on live data. Adds `first-class-cancelled` tag, removes `first-class-booked`. |
+| **First class attended** | ✅ Working | Tested end-to-end on live data (Glofox fires `BOOKING_UPDATED` with `Payload.attended: true` to signal attendance — `Payload.status` stays `BOOKED`). Adds `first-class-attended` tag, removes `first-class-booked`. |
+| **First class no-show** | 🚧 Blocked on Glofox | Built to fire on `BOOKING_UPDATED` + `Payload.attended: false` (adds `first-class-no-show` tag, removes `first-class-booked`, mirroring the attended branch), but **can't be exercised**: Glofox doesn't appear to fire any webhook when a booking is marked no-show. Open question with Glofox. Tag name and hardcoded test location remain placeholders. |
 
 ---
 
 ## 5. How to add a new studio (when we're ready to roll out)
 
-1. **Add a row to the [studio config sheet](https://docs.google.com/spreadsheets/d/10JeveuIeXNGsGyDQD5dvFLKzOoOzIN8ffRwszGuu2XA/edit)** — Studio Name, Branch ID (from Glofox), API Key, API Token.
+> **Direction of travel:** the long-term target is the Data Table cache (§2.5) feeding a single master workflow. In that model, adding a studio is just **adding a row to the studio config sheet** — the sync workflow picks it up into the `studio_config` cache within 15 minutes (or instantly, via the `onChange` instant-refresh webhook), and the master workflow resolves everything it needs from that row. The per-studio steps below are the **current manual process** until that consolidation is complete.
+
+1. **Add a row to the [studio config sheet](https://docs.google.com/spreadsheets/d/10JeveuIeXNGsGyDQD5dvFLKzOoOzIN8ffRwszGuu2XA/edit)** — Studio Name, Branch ID (from Glofox), API Key, API Token. (The sync workflow upserts this into the `studio_config` Data Table that the webhook flow reads.)
 2. **Create a Private Integration in the GHL sub-account** (Settings → Private Integrations) with View/Edit Contacts scopes. Copy the PIT.
 3. **Note the GHL Location ID** for the sub-account (Settings → Business Profile).
 4. **In n8n: duplicate the test workflow**, update:
@@ -147,9 +165,10 @@ Failures on any node route to the shared **Error Handler** workflow (`AKbzN48d9D
 ## 6. Open items / what's next
 
 - **Total attendance count to GHL custom field:** for downstream GHL automations triggered on milestones (e.g. 5 / 10 / 25 classes attended). Plan: a parallel branch off `Get Booking Count` that fires on every `BOOKING_UPDATED + attended === true` event (not gated by first-class filter), derives the count via `data.filter(b => b.attended === true).length`, and PUTs/upserts a GHL custom field. Needs the GHL custom field to be created first and its Custom Field ID captured.
-- **No-show case:** now handled by the **NO_SHOW** branch — Glofox fires `BOOKING_UPDATED` with `payload.attended: false`, which we tag as `first-class-no-show` (and remove `first-class-booked`). Still to confirm before go-live: the exact GHL tag name for the re-engagement automation, and moving the location off the hardcoded test value to the studio config sheet.
-- **GHL sub-account is currently hardcoded per workflow:** the four GHL HTTP nodes each have `locationId` baked into the body and an HTTP Header Auth credential pinned to the test sub-account's PIT. Only the Glofox API creds are looked up from the studio config sheet. Before cloning this workflow to additional studios, extend the sheet with `GHL Location ID` and `GHL Private Integration Token` columns and rewire the GHL nodes to read both from the sheet (analogous to how Glofox creds work today). That turns it into one master workflow that handles every studio.
-- **Multi-studio consolidation:** once the per-studio approach is proven across a few studios, consider collapsing to a single master workflow with dynamic GHL credential lookup. Saves on maintenance and on Glofox support tickets (one webhook URL handles all studios). Depends on the previous item being done.
-- **New workflow: Purchase → first-class nudge:** when a member completes a purchase in Glofox (separate webhook event, payload still TBC), wait 10 minutes, then check if they've booked a class. If yes, apply `first-class-booked` tag as a safety net; if no, apply a nudge tag like `purchase-no-booking-yet` that triggers a "please book your first class" automation in GHL. Same upstream as the First Class workflow (Sheets lookup, member email lookup) plus a Wait node and post-wait booking check. Needs: a sample purchase webhook payload from Glofox + the exact GHL tag name for the nudge automation + Glofox support to register the webhook URL if it's not already firing through the existing endpoint.
-- **Error handling:** ✅ wired — the workflow's `errorWorkflow` setting routes any node failure (missing branch ID in the sheet, GHL API error, etc.) to the shared **Error Handler** workflow (`AKbzN48d9DQwMioQ`), which posts to Slack `#5c-n8n-errors`.
+- **Studio config cache (#19): ✅ done.** The webhook flow now resolves studio config from the `studio_config` Data Table instead of reading the Google Sheet per event, kept in sync by the **Sync Studio Config → Data Table** workflow (§2.5). This eliminated the HTTP 429 failures seen at high volume; the workflow has run on live traffic with zero 429 errors since. Issue #19 is closed.
+- **No-show case: 🚧 blocked on Glofox.** The **NO_SHOW** branch is built (fires on `BOOKING_UPDATED` + `Payload.attended: false`, tags `first-class-no-show`, removes `first-class-booked`), but Glofox doesn't appear to fire any webhook when a booking is marked no-show, so the branch can't be exercised. Open question with Glofox. Once that's resolved, still to confirm before go-live: the exact GHL tag name for the re-engagement automation, and moving the location off the hardcoded test value to the studio config sheet.
+- **GHL sub-account is currently hardcoded per workflow:** the GHL HTTP nodes each use a hardcoded test `locationId` (`JHgfCMprry4fxGOzRsYl`) baked into the body and the `HighLevel PIT - Test Sub Account` HTTP Header Auth credential — **not** read from the cache. Only the Glofox API creds come from the `studio_config` cache. The `studio_config` Data Table already carries `ghl_location` and `ghl_pit` columns for this purpose; the remaining work is rewiring the GHL nodes to read both from the cache row (analogous to how Glofox creds work today). That turns it into one master workflow that handles every studio.
+- **Multi-studio consolidation:** once the per-studio approach is proven across a few studios, consider collapsing to a single master workflow with dynamic GHL credential lookup from the cache. Saves on maintenance and on Glofox support tickets (one webhook URL handles all studios). Depends on the previous item being done.
+- **New workflow: Purchase → first-class nudge:** when a member completes a purchase in Glofox (separate webhook event, payload still TBC), wait 10 minutes, then check if they've booked a class. If yes, apply `first-class-booked` tag as a safety net; if no, apply a nudge tag like `purchase-no-booking-yet` that triggers a "please book your first class" automation in GHL. Same upstream as the First Class workflow (Data Table cache lookup, member email lookup) plus a Wait node and post-wait booking check. Needs: a sample purchase webhook payload from Glofox + the exact GHL tag name for the nudge automation + Glofox support to register the webhook URL if it's not already firing through the existing endpoint.
+- **Error handling:** ✅ wired — the workflow's `errorWorkflow` setting routes any node failure (GHL API error, Glofox API error, etc.) to the shared **Error Handler** workflow (`AKbzN48d9DQwMioQ`), which posts to Slack `#5c-n8n-errors`.
 - **Cut over from Zapier:** the existing Zapier flow is still receiving Glofox webhooks. When we're ready, Glofox needs to switch the registered URL from the Zapier endpoint to the n8n endpoint, and we pause the corresponding Zaps.

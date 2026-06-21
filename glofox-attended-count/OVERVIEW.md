@@ -18,16 +18,20 @@ This logic was originally proposed as a branch inside [glofox-first-class](../gl
 ## 3. The flow
 
 ```
-Glofox Webhook → Only Attended Events → Get Member → Get Bookings → GHL: Update Total Attended Count
+Glofox Webhook → Save Branch ID (filter) → Only Attended Events → Lookup Studio (cache) → Resolve Studio (by position) → Studio In Sheet? → Get Member → Glofox: Get Bookings → GHL: Update Total Attended Count
 ```
 
 | Node | What it does |
 |---|---|
-| **Glofox Webhook** | Receives Glofox booking events on path `glofox-attended-count`. |
-| **Only Attended Events** | Single-output gate — stops the run unless `type === BOOKING_UPDATED && payload.attended === true`. Not a branch. |
+| **Glofox Webhook** | Receives Glofox booking events on path `glofox-attended-count`. Payload top-level keys are **PascalCase** (`Type` / `Metadata` / `Payload`; nested keys stay lowercase). |
+| **Save Branch ID (filter)** | Execution Data node — saves `Metadata.location_id` as highlighted execution data, so the Executions list can be filtered per studio. |
+| **Only Attended Events** | Single-output gate — stops the run unless `Type === BOOKING_UPDATED && Payload.attended === true`. Not a branch. |
+| **Lookup Studio (cache)** | Data Table **"Get row"** against the `studio_config` table where `branch_id == Metadata.location_id`. Resolves studio config from the cache instead of reading the Google Sheet on every event (see §5). |
+| **Resolve Studio (by position)** | Code node — takes the single row returned by the cache lookup and renames the snake_case columns to the camelCase names the downstream nodes expect (`branchId` / `apiKey` / `apiToken` / `ghlLocation` / `ghlPit`). |
+| **Studio In Sheet?** | Gate — proceeds only if a matching studio row was resolved; unknown studios halt silently. |
 | **Get Member** | `GET /members/{user_id}` → the member's **email** (needed to match the GHL contact; not in the webhook or bookings response). |
-| **Get Bookings** | `GET /bookings?user_id={user_id}&attended=true&status=BOOKED` → read **`total_count`**. The `&status=BOOKED` filter excludes cancelled-but-attended bookings, so the count reflects only attended classes that weren't later cancelled (decided in #12). |
-| **GHL: Update Total Attended Count** | `POST /contacts/upsert` writing the count to the "Total Classes Attended" custom field. |
+| **Glofox: Get Bookings** | `GET /bookings?user_id={user_id}&attended=true&status=BOOKED` → read **`total_count`**. The `&status=BOOKED` filter excludes cancelled-but-attended bookings, so the count reflects only attended classes that weren't later cancelled (decided in #12). |
+| **GHL: Update Total Attended Count** | `POST /contacts/upsert` writing the count to the "Total Classes Attended" custom field. GHL location + PIT come **from the cache** (`ghl_location` / `ghl_pit`), so this workflow pulls its GHL creds dynamically (unlike First Class, which hardcodes them). |
 
 ## 4. Key findings (verified empirically against the test sub-account)
 
@@ -41,23 +45,26 @@ Glofox Webhook → Only Attended Events → Get Member → Get Bookings → GHL:
 
 ## 5. Current state
 
-- Draft workflow in n8n: **Glofox → GHL Total Classes Attended** (id `yfMSLNQnB6Y4zf0X`), inactive.
-- **Now has the standardised studio-config lookup step** (2026-06-15) — was the only automation missing it. Flow: `Webhook → Only Attended Events → Lookup Studio Config → Resolve Studio (by position) → Studio In Sheet? → Get Member → Get Bookings → GHL update`.
-- **All dynamic values pull from the studio sheet.** The lookup is **future-proof against header renames**: a `Lookup Studio Config` Google Sheets node reads **all** rows, and a `Resolve Studio (by position)` Code node matches the branch and reads columns **by position** (after dropping n8n's `row_number`): `0 Studio | 1 Branch ID | 2 API Key | 3 API Token | 4 GHL Location | 5 GHL PIT`. So renaming a column header doesn't break anything.
-- **Glofox creds: ✅ tested green** — Get Member + Get Bookings ran successfully pulling API key/token/branch from the sheet (replaced the old hardcoded values).
-- **GHL location + PIT: wired to the sheet** (positions 4/5) but ⚠️ **not yet green** — the test branch `66cfc853…` has a **duplicate sheet row** ("AI Testing Tool - Test Sub Account" matched first) that holds `"tester"`/`"Done - DG"` where GHL Location/PIT should be, so the upsert 401'd (`locationId: "tester"`). **Fix = clean the sheet: one row per branch with GHL Location/PIT in columns 5/6** (the Abhi Test layout). Tracked in #13.
-- Committed JSON now reflects the live sheet-driven design (no inline creds — all expressions referencing the sheet).
+- Workflow in n8n: **Glofox → GHL Total Classes Attended** (id `yfMSLNQnB6Y4zf0X`), **active**.
+- **Studio config is resolved from an n8n Data Table cache, not the Google Sheet** (2026-06-21, #19). Flow: `Webhook → Save Branch ID (filter) → Only Attended Events → Lookup Studio (cache) → Resolve Studio (by position) → Studio In Sheet? → Get Member → Glofox: Get Bookings → GHL update`. The webhook workflows used to read the sheet on every event, which hit Google's Sheets API limit (~60 read-requests/min/user) and failed with HTTP 429 at high volume (~79k events in 24h).
+- **The cache is the `studio_config` Data Table** (columns: `branch_id` [key], `studio_name`, `api_key`, `api_token`, `ghl_location`, `ghl_pit`). The `Lookup Studio (cache)` node is a Data Table **"Get row"** matching `branch_id == Metadata.location_id`.
+- **`Resolve Studio (by position)` now just renames columns** — it takes the single row returned by the cache lookup and maps the snake_case columns to the camelCase names downstream nodes use (`branchId` / `apiKey` / `apiToken` / `ghlLocation` / `ghlPit`). It no longer scans all rows or matches by position.
+- **The sheet is kept human-editable and stays the source of truth.** A separate workflow **"Sync Studio Config → Data Table"** (n8n id `mKrkdoAQ85WCZiJF`; repo folder [`../sync-studio-config/`](../sync-studio-config/)) reads the sheet **once per run** and upserts into the table on a **15-min schedule**, plus an **instant refresh** via a secured webhook fired by an Apps Script `onChange` trigger on the sheet.
+- **Glofox creds: ✅ tested green** — Get Member + Glofox: Get Bookings pull API key/token/branch from the cache.
+- **GHL location + PIT: ✅ tested green** — sourced from the cache (`ghl_location` / `ghl_pit`). A real `BOOKING_UPDATED` + attended event resolved the studio creds from the cache and wrote the attendance count to the GHL custom field end-to-end on live data.
+- **The old #13 duplicate-row problem is worked around, not fully fixed.** Branch `66cfc853…` had a duplicate sheet row holding `"tester"`/`"Done - DG"` where GHL Location/PIT belong, which 401'd the upsert. It was worked around by ordering the correct row first in the sheet; the cache sync **dedupes by Branch ID keeping the first row**, so the cache holds the correct creds. Cleaning the sheet (one row per branch) is still the proper fix — tracked in #13.
+- The **"Unknown Studio / Bad Input" Stop & Error** guard was removed; unknown studios now halt silently.
 - Error handling is wired: `errorWorkflow` → shared **Error Handler** (`AKbzN48d9DQwMioQ`) → Slack `#5c-n8n-errors`.
 
 ## 6. Open items
 
 Tracked as GitHub issues under the [`glofox-attended-count`](https://github.com/SocialFitnessManchester/n8n-automations/labels/glofox-attended-count) label:
 
-- **#9** — Wire real GHL config (location ID + custom field ID) and run end-to-end
-- **#10** — Verify `total_count` reports the true count at scale (1000s of bookings)
-- **#11** — Register the webhook URL with Glofox support
+- **#9** — Wire real GHL config (location ID + custom field ID) and run end-to-end. ✅ **Done** — GHL location + PIT now resolve from the cache and the upsert writes the count to the custom field, verified on live data.
+- **#10** — Verify `total_count` reports the true count at scale (1000s of bookings). ⚠️ Still open — the GHL write works, but the at-scale `total_count` verification is separate.
+- **#11** — Register the webhook URL with Glofox support. ✅ **Done-ish** — now on the production webhook URL and tested green end-to-end.
 - **#12** — Confirm the `attended=true` filter on a mixed attended/not-attended member
-- **#13** — Move Glofox creds to the studio config sheet + export sanitized workflow JSON
+- **#13** — Clean the studio config sheet: one row per branch (remove duplicates like `66cfc853…`) so the correct GHL Location/PIT are authoritative. Currently worked around by row ordering + the cache sync's dedupe-by-Branch-ID; sheet cleanup remains the proper fix.
 
 ## 7. History
 

@@ -15,17 +15,18 @@ This is the **lead-stage** counterpart to [glofox-new-purchase](../glofox-new-pu
 ## 2. The flow
 
 ```
-Glofox Webhook → Only New Leads → Lookup Studio Config → Studio In Sheet? ─┬─ no → Stop & Error
-                                                                           └─ yes → Get Lead Details → Has Offer? ─┬─ yes → GHL: Upsert (Offer)
-                                                                                                                   └─ no  → GHL: Upsert (General)
+Glofox Webhook → Save Branch ID (filter) → Only New Leads → Lookup Studio (cache) → Studio In Sheet? ─┬─ no → halts silently
+                                                                                                       └─ yes → Get Lead Details → Has Offer? ─┬─ yes → GHL: Upsert (Offer)
+                                                                                                                                               └─ no  → GHL: Upsert (General)
 ```
 
 | Node | What it does |
 |---|---|
-| **Glofox Webhook** | Receives Glofox lead events on path `glofox-new-lead`. Responds immediately (`onReceived`). |
+| **Glofox Webhook** | Receives Glofox lead events on path `glofox-new-lead`. Responds immediately (`onReceived`). Top-level payload keys are **PascalCase** (`Type`/`Metadata`/`Payload`; nested keys lowercase). |
+| **Save Branch ID (filter)** | Saves `location_id` (from `Metadata`) for per-studio execution filtering. |
 | **Only New Leads** | Passes only the lead-created event. ⚠️ event name `LEAD_CREATED` is a placeholder. |
-| **Lookup Studio Config** | Finds the studio row by Branch ID (`metadata.location_id`) → Glofox API creds (sheet-driven). |
-| **Studio In Sheet?** | Guard — continue only if the branch is found AND a `lead_id` is present; otherwise Stop & Error (routes to the shared Error Handler / Slack). |
+| **Lookup Studio (cache)** | Data Table **`studio_config`** "Get row" where `branch_id == Metadata.location_id` → Glofox API creds + GHL location/PIT. Replaces the old Google Sheets lookup (avoids Google's ~60 reads/min Sheets limit / HTTP 429); the table is kept in sync from the sheet by the separate [sync-studio-config](../sync-studio-config/) workflow. |
+| **Studio In Sheet?** | Guard — continue only if the branch is found AND a `lead_id` is present; else **halts silently** (the cache simply returns no row — the old "Unknown Studio / Bad Input" Stop & Error node has been removed). |
 | **Get Lead Details** | `GET /leads/{lead_id}` → email, name, phone. ⚠️ Placeholder endpoint — may be unnecessary if the webhook already carries these. |
 | **Has Offer?** | Splits "specific offer" leads from "general enquiry" leads. ⚠️ Placeholder offer field path. |
 | **GHL: Upsert (Offer)** | Upsert contact + tags `new-lead`, `lead-with-offer` + write `latest_offer_registered_for`. |
@@ -62,6 +63,7 @@ Tracked in [#17 — capture the real Glofox lead webhook payload](https://github
 ## 5. Current state
 
 - **Created in n8n** as **Glofox New Lead → GHL Contact** (id `FqmDta5ldKcD4Nzq`), **inactive/draft**. Validated green (0 errors). Importable JSON mirror at [`workflows/glofox-new-lead.json`](./workflows/glofox-new-lead.json).
+- **Studio lookup is now cache-based** ([#19](https://github.com/SocialFitnessManchester/n8n-automations/issues/19), closed): the per-event Google Sheets read was replaced by a Data Table **`studio_config`** "Get row" node ("Lookup Studio (cache)"), keyed on `branch_id`, to avoid Google's ~60 reads/min Sheets limit (HTTP 429 at volume). The table is kept in sync from the (still human-editable) sheet by the separate [sync-studio-config](../sync-studio-config/) workflow (n8n id `mKrkdoAQ85WCZiJF`; 15-min schedule + instant webhook from an Apps Script `onChange` trigger). Webhook payload keys are now **PascalCase**, a **"Save Branch ID (filter)"** node was added, and the old "Unknown Studio / Bad Input" **Stop & Error guard was removed** (unknown studios halt silently). None of this unblocks the workflow.
 
 ### Stress test (2026-06-15) — same regime as the sibling workflows
 
@@ -70,10 +72,12 @@ Fired edge-case webhook payloads via `curl` at the live endpoint and checked rou
 | Case | Payload | Result |
 |---|---|---|
 | Wrong event type | `type` ≠ `LEAD_CREATED` | ✅ Filter "Only New Leads" drops it (no-op, ~38ms, no alert). |
-| Unknown branch | `LEAD_CREATED`, branch `…deadbeef` | ✅ Guard "Studio In Sheet?" → Stop & Error (clean message) → Error Handler. |
+| Unknown branch | `LEAD_CREATED`, branch `…deadbeef` | ✅ Guard "Studio In Sheet?" → halts silently (post-cache-migration; previously Stop & Error → Error Handler). |
 | Empty `metadata`/`payload` | `{}` / `{}` | 🔴→✅ **Found a bug, then fixed it.** |
 
 **Bug found & fixed:** a missing `metadata.location_id` (undefined) made the Google Sheets lookup throw a raw `TypeError: Cannot read properties of undefined (reading 'toString')` **before** reaching the guard — an ungraceful failure. Fixed by making the lookup value null-safe: `={{ ($('Glofox Webhook').item.json.body.metadata || {}).location_id || 'NO_BRANCH_ID' }}`. Re-tested: the empty case now flows to the guard and stops cleanly with the descriptive "bad input" message. ⚠️ **The same latent bug exists in the sibling workflows** (New Purchase, First Class, etc.) — they share the lookup-then-guard pattern and were only ever tested with a *present* (if fake) branch ID. Tracked for hardening in [#18](https://github.com/SocialFitnessManchester/n8n-automations/issues/18).
+
+> 📝 **Note (post-cache-migration, [#19](https://github.com/SocialFitnessManchester/n8n-automations/issues/19)):** the above Sheets `TypeError` is now **moot for this workflow**. The studio lookup is a Data Table "Get row" node ("Lookup Studio (cache)"), not a Google Sheets node, so that specific Sheets TypeError can no longer occur here. History retained for context. (This migration does **not** unblock the workflow — it's still a dummy blocked on #17.)
 - ⚠️ **Dummy** — built on assumed field paths (see §4); cannot be tested for real until the lead payload lands (#17).
 - Error handling wired: `errorWorkflow` → shared Error Handler (`AKbzN48d9DQwMioQ` → Slack `#5c-n8n-errors`).
 - Hardcoded test location (`JHgfCMprry4fxGOzRsYl`) + test-sub-account PIT, same as the sibling workflows; move to the studio config sheet for multi-studio (#13).
