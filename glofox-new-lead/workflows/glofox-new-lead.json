@@ -7,16 +7,15 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        -1000,
-        300
+        -1008,
+        304
       ],
       "parameters": {
         "httpMethod": "POST",
         "path": "glofox-new-lead",
-        "responseMode": "onReceived",
         "options": {}
       },
-      "notes": "Receives Glofox lead events. ⚠️ PLACEHOLDER: we do NOT yet have a real LEAD_CREATED payload — see issue for the real shape. Go-live needs Glofox to register this URL. Pin a dummy payload here to test.",
+      "notes": "Receives Glofox lead events. PLACEHOLDER: no real LEAD_CREATED payload yet — see issue #17. Go-live needs Glofox to register this URL. Pin a dummy payload here to test.",
       "webhookId": "0a1b2c3d-4e5f-6071-8293-a4b5c6d7e8f9"
     },
     {
@@ -25,16 +24,16 @@
       "type": "n8n-nodes-base.filter",
       "typeVersion": 2.2,
       "position": [
-        -780,
-        300
+        -784,
+        304
       ],
       "parameters": {
         "conditions": {
           "options": {
-            "version": 3,
-            "leftValue": "",
             "caseSensitive": true,
-            "typeValidation": "strict"
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
           },
           "conditions": [
             {
@@ -51,48 +50,7 @@
         },
         "options": {}
       },
-      "notes": "⚠️ PLACEHOLDER event name 'LEAD_CREATED' — confirm the real Glofox lead event type from the captured payload."
-    },
-    {
-      "id": "l3",
-      "name": "Lookup Studio Config",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.7,
-      "position": [
-        -560,
-        300
-      ],
-      "parameters": {
-        "authentication": "serviceAccount",
-        "documentId": {
-          "__rl": true,
-          "value": "10JeveuIeXNGsGyDQD5dvFLKzOoOzIN8ffRwszGuu2XA",
-          "mode": "id",
-          "cachedResultName": "Glofox to GHL - Studio Config"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "gid=0",
-          "mode": "list",
-          "cachedResultName": "Sheet1"
-        },
-        "filtersUI": {
-          "values": [
-            {
-              "lookupColumn": "Branch ID",
-              "lookupValue": "={{ ($('Glofox Webhook').item.json.body.Metadata || {}).location_id || 'NO_BRANCH_ID' }}"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "credentials": {
-        "googleApi": {
-          "id": "PvDoggN1HExofTc3",
-          "name": "Google Service Account account"
-        }
-      },
-      "alwaysOutputData": true
+      "notes": "PLACEHOLDER event name 'LEAD_CREATED' — confirm the real Glofox lead event type from the captured payload (#17)."
     },
     {
       "id": "l-guard-if",
@@ -100,8 +58,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -450,
-        300
+        -448,
+        304
       ],
       "parameters": {
         "conditions": {
@@ -114,7 +72,7 @@
           "conditions": [
             {
               "id": "studio-found",
-              "leftValue": "={{ $('Lookup Studio Config').item.json['Branch ID'] }}",
+              "leftValue": "={{ $('Lookup Studio (cache)').item.json.branch_id }}",
               "rightValue": "",
               "operator": {
                 "type": "string",
@@ -137,7 +95,7 @@
         },
         "options": {}
       },
-      "notes": "Guard: continue only if branch found in sheet AND lead_id present. Else -> Stop and Error (loud alert). ⚠️ PLACEHOLDER: 'lead_id' field path assumed — confirm from real payload."
+      "notes": "Guard: continue only if branch found in sheet AND lead_id present. Else -> Stop and Error. PLACEHOLDER: 'lead_id' field path assumed (#17)."
     },
     {
       "id": "l4",
@@ -146,7 +104,7 @@
       "typeVersion": 4.4,
       "position": [
         -240,
-        220
+        224
       ],
       "parameters": {
         "url": "=https://gf-api.aws.glofox.com/prod/2.0/leads/{{ $('Glofox Webhook').item.json.body.Payload.lead_id }}",
@@ -159,21 +117,21 @@
             },
             {
               "name": "x-api-key",
-              "value": "={{ $('Lookup Studio Config').item.json['API Key'] }}"
+              "value": "={{ $('Lookup Studio (cache)').item.json.api_key }}"
             },
             {
               "name": "x-glofox-api-token",
-              "value": "={{ $('Lookup Studio Config').item.json['API Token'] }}"
+              "value": "={{ $('Lookup Studio (cache)').item.json.api_token }}"
             },
             {
               "name": "x-glofox-branch-id",
-              "value": "={{ $('Lookup Studio Config').item.json['Branch ID'] }}"
+              "value": "={{ $('Lookup Studio (cache)').item.json.branch_id }}"
             }
           ]
         },
         "options": {}
       },
-      "notes": "⚠️ PLACEHOLDER endpoint '/leads/{id}' — confirm Glofox actually exposes a lead-detail endpoint and what it returns (email, name, phone, and whether the offer/interest is here vs on the webhook). If the webhook payload already carries email/name/phone, this node may be unnecessary."
+      "notes": "PLACEHOLDER endpoint '/leads/{id}' — confirm Glofox exposes a lead-detail endpoint and what it returns (email/name/phone, and whether the offer is here vs on the webhook). If the webhook already carries email/name/phone, this node may be unnecessary (#17)."
     },
     {
       "id": "l-offer-if",
@@ -181,8 +139,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -20,
-        220
+        -16,
+        224
       ],
       "parameters": {
         "conditions": {
@@ -208,7 +166,7 @@
         },
         "options": {}
       },
-      "notes": "Splits 'specific offer' leads (FB lead ad / GHL form / studio site with an offer) from 'general enquiry' leads. ⚠️ PLACEHOLDER offer field path 'payload.offer_name' — confirm where (if anywhere) the offer lives in the real payload."
+      "notes": "Splits 'specific offer' leads from 'general enquiry' leads. PLACEHOLDER offer field path 'payload.offer_name' — confirm where (if anywhere) the offer lives in the real payload (#17)."
     },
     {
       "id": "l5a",
@@ -216,8 +174,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        220,
-        120
+        208,
+        80
       ],
       "parameters": {
         "method": "POST",
@@ -242,13 +200,13 @@
         "jsonBody": "={\n  \"locationId\": \"JHgfCMprry4fxGOzRsYl\",\n  \"email\": \"{{ $('Get Lead Details').item.json.email }}\",\n  \"firstName\": \"{{ $('Get Lead Details').item.json.first_name }}\",\n  \"lastName\": \"{{ $('Get Lead Details').item.json.last_name }}\",\n  \"phone\": \"{{ $('Get Lead Details').item.json.phone }}\",\n  \"tags\": [\"new-lead\", \"lead-with-offer\"],\n  \"customFields\": [\n    {\n      \"key\": \"latest_offer_registered_for\",\n      \"field_value\": \"{{ $('Glofox Webhook').item.json.body.Payload.offer_name }}\"\n    }\n  ]\n}",
         "options": {}
       },
+      "notes": "Offer branch: upsert + tags ['new-lead','lead-with-offer'] + write 'latest_offer_registered_for'. Upsert (not create) so a contact already in GHL from a FB lead ad / form is updated, not duplicated. Hardcoded test location + PIT (move to sheet, #13). Tag names placeholder.",
       "credentials": {
         "httpHeaderAuth": {
           "id": "MrMlsn2HCSVdVi0O",
           "name": "HighLevel PIT - Test Sub Account"
         }
-      },
-      "notes": "Offer branch: upsert + tags ['new-lead','lead-with-offer'] + write 'latest_offer_registered_for'. Upsert (not create) so a contact already in GHL from a FB lead ad / form is updated, not duplicated. ⚠️ Hardcoded test location + PIT (move to sheet for multi-studio, see #13). Tag names are placeholders to finalise with stakeholders."
+      }
     },
     {
       "id": "l5b",
@@ -256,7 +214,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        220,
+        224,
         320
       ],
       "parameters": {
@@ -282,22 +240,22 @@
         "jsonBody": "={\n  \"locationId\": \"JHgfCMprry4fxGOzRsYl\",\n  \"email\": \"{{ $('Get Lead Details').item.json.email }}\",\n  \"firstName\": \"{{ $('Get Lead Details').item.json.first_name }}\",\n  \"lastName\": \"{{ $('Get Lead Details').item.json.last_name }}\",\n  \"phone\": \"{{ $('Get Lead Details').item.json.phone }}\",\n  \"tags\": [\"new-lead\", \"general-enquiry\"]\n}",
         "options": {}
       },
+      "notes": "General-enquiry branch: upsert + tags ['new-lead','general-enquiry']. Deliberately NO customFields — so we don't blank out an offer already captured from another source (FB lead ad / form). Hardcoded test location + PIT (move to sheet, #13). Tag names placeholder.",
       "credentials": {
         "httpHeaderAuth": {
           "id": "MrMlsn2HCSVdVi0O",
           "name": "HighLevel PIT - Test Sub Account"
         }
-      },
-      "notes": "General-enquiry branch: upsert + tags ['new-lead','general-enquiry']. Deliberately NO customFields — so we don't blank out an offer that was already captured from another source (FB lead ad / form). ⚠️ Hardcoded test location + PIT (move to sheet, see #13). Tag names are placeholders."
+      }
     },
     {
-      "id": "save-branch-filter",
+      "id": "292352dd-c19d-4fdf-8ff5-af815d872d7a",
       "name": "Save Branch ID (filter)",
       "type": "n8n-nodes-base.executionData",
       "typeVersion": 1.1,
       "position": [
-        -880,
-        300
+        -896,
+        304
       ],
       "parameters": {
         "operation": "save",
@@ -309,8 +267,41 @@
             }
           ]
         }
+      }
+    },
+    {
+      "id": "10151056-e1c9-48be-90e8-a9da81f2a4ea",
+      "name": "Lookup Studio (cache)",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -624,
+        304
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Ba4cRH8IzwZG9WqJ",
+          "cachedResultName": "studio_config"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "branch_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Glofox Webhook').item.json.body.Metadata.location_id }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1,
+        "options": {}
       },
-      "notes": "Saves the studio Branch ID as highlighted execution data so runs are filterable per-studio in the Executions list."
+      "notes": "Cache lookup: studio row from studio_config Data Table by branch_id (=location_id). Replaces per-event Google Sheets read (#19). No match -> halts silently."
     }
   ],
   "connections": {
@@ -329,18 +320,7 @@
       "main": [
         [
           {
-            "node": "Lookup Studio Config",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Lookup Studio Config": {
-      "main": [
-        [
-          {
-            "node": "Studio In Sheet?",
+            "node": "Lookup Studio (cache)",
             "type": "main",
             "index": 0
           }
@@ -392,6 +372,17 @@
         [
           {
             "node": "Only New Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Studio (cache)": {
+      "main": [
+        [
+          {
+            "node": "Studio In Sheet?",
             "type": "main",
             "index": 0
           }

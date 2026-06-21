@@ -5,7 +5,6 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "glofox-purchase-nudge-test",
-        "responseMode": "onReceived",
         "options": {}
       },
       "id": "node-webhook",
@@ -13,7 +12,7 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        -1504,
+        -1744,
         208
       ],
       "webhookId": "glofox-purchase-nudge-test",
@@ -23,10 +22,10 @@
       "parameters": {
         "conditions": {
           "options": {
-            "caseSensitive": true,
+            "version": 3,
             "leftValue": "",
-            "typeValidation": "strict",
-            "version": 3
+            "caseSensitive": true,
+            "typeValidation": "strict"
           },
           "conditions": [
             {
@@ -48,50 +47,9 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -1296,
+        -1536,
         208
       ]
-    },
-    {
-      "parameters": {
-        "authentication": "serviceAccount",
-        "documentId": {
-          "__rl": true,
-          "value": "10JeveuIeXNGsGyDQD5dvFLKzOoOzIN8ffRwszGuu2XA",
-          "mode": "id",
-          "cachedResultName": "Glofox to GHL - Studio Config"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "gid=0",
-          "mode": "list",
-          "cachedResultName": "Sheet1"
-        },
-        "filtersUI": {
-          "values": [
-            {
-              "lookupColumn": "Branch ID",
-              "lookupValue": "={{ ($('Glofox Webhook').item.json.body.Metadata || {}).location_id || 'NO_BRANCH_ID' }}"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "node-sheets",
-      "name": "Lookup Studio Config",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.7,
-      "position": [
-        -1104,
-        208
-      ],
-      "credentials": {
-        "googleApi": {
-          "id": "PvDoggN1HExofTc3",
-          "name": "Google Service Account account"
-        }
-      },
-      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -105,15 +63,15 @@
             },
             {
               "name": "x-api-key",
-              "value": "={{ $('Lookup Studio Config').item.json['API Key'] }}"
+              "value": "={{ $('Lookup Studio (cache)').item.json.api_key }}"
             },
             {
               "name": "x-glofox-api-token",
-              "value": "={{ $('Lookup Studio Config').item.json['API Token'] }}"
+              "value": "={{ $('Lookup Studio (cache)').item.json.api_token }}"
             },
             {
               "name": "x-glofox-branch-id",
-              "value": "={{ $('Lookup Studio Config').item.json['Branch ID'] }}"
+              "value": "={{ $('Lookup Studio (cache)').item.json.branch_id }}"
             }
           ]
         },
@@ -124,7 +82,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        -896,
+        -864,
         208
       ]
     },
@@ -138,7 +96,7 @@
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        -704,
+        -672,
         208
       ],
       "webhookId": "wait-10-minutes-purchase-nudge"
@@ -155,15 +113,15 @@
             },
             {
               "name": "x-api-key",
-              "value": "={{ $('Lookup Studio Config').item.json['API Key'] }}"
+              "value": "={{ $('Lookup Studio (cache)').item.json.api_key }}"
             },
             {
               "name": "x-glofox-api-token",
-              "value": "={{ $('Lookup Studio Config').item.json['API Token'] }}"
+              "value": "={{ $('Lookup Studio (cache)').item.json.api_token }}"
             },
             {
               "name": "x-glofox-branch-id",
-              "value": "={{ $('Lookup Studio Config').item.json['Branch ID'] }}"
+              "value": "={{ $('Lookup Studio (cache)').item.json.branch_id }}"
             }
           ]
         },
@@ -291,14 +249,6 @@
       }
     },
     {
-      "id": "pn-guard-if",
-      "name": "Studio In Sheet?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [
-        -1000,
-        208
-      ],
       "parameters": {
         "conditions": {
           "options": {
@@ -310,7 +260,7 @@
           "conditions": [
             {
               "id": "studio-found",
-              "leftValue": "={{ $('Lookup Studio Config').item.json['Branch ID'] }}",
+              "leftValue": "={{ $('Lookup Studio (cache)').item.json.branch_id }}",
               "rightValue": "",
               "operator": {
                 "type": "string",
@@ -333,17 +283,17 @@
         },
         "options": {}
       },
+      "id": "pn-guard-if",
+      "name": "Studio In Sheet?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1056,
+        208
+      ],
       "notes": "Guard: continue only if branch found in sheet AND user_id present. Else -> Stop and Error (loud alert)."
     },
     {
-      "id": "save-branch-filter",
-      "name": "Save Branch ID (filter)",
-      "type": "n8n-nodes-base.executionData",
-      "typeVersion": 1.1,
-      "position": [
-        -1384,
-        208
-      ],
       "parameters": {
         "operation": "save",
         "dataToSave": {
@@ -355,7 +305,48 @@
           ]
         }
       },
-      "notes": "Saves the studio Branch ID as highlighted execution data so runs are filterable per-studio in the Executions list."
+      "id": "05e0ba4d-680e-457a-a17c-07d5dee38c31",
+      "name": "Save Branch ID (filter)",
+      "type": "n8n-nodes-base.executionData",
+      "typeVersion": 1.1,
+      "position": [
+        -1640,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Ba4cRH8IzwZG9WqJ",
+          "cachedResultName": "studio_config"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "branch_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Glofox Webhook').item.json.body.Metadata.location_id }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1,
+        "options": {}
+      },
+      "id": "57e89168-8438-442d-acfe-6df31c7664f7",
+      "name": "Lookup Studio (cache)",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -1312,
+        176
+      ],
+      "notes": "Cache lookup: studio row from studio_config Data Table by branch_id (=location_id). Replaces per-event Google Sheets read (#19). No match -> halts silently."
     }
   ],
   "connections": {
@@ -374,12 +365,11 @@
       "main": [
         [
           {
-            "node": "Lookup Studio Config",
+            "node": "Lookup Studio (cache)",
             "type": "main",
             "index": 0
           }
-        ],
-        []
+        ]
       ]
     },
     "Get Member Email": {
@@ -433,17 +423,6 @@
         ]
       ]
     },
-    "Lookup Studio Config": {
-      "main": [
-        [
-          {
-            "node": "Studio In Sheet?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Studio In Sheet?": {
       "main": [
         [
@@ -460,6 +439,17 @@
         [
           {
             "node": "Is MEMBERSHIP_CREATED?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Studio (cache)": {
+      "main": [
+        [
+          {
+            "node": "Studio In Sheet?",
             "type": "main",
             "index": 0
           }

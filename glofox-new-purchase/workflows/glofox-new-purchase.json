@@ -7,13 +7,12 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        -1000,
-        300
+        -1008,
+        304
       ],
       "parameters": {
         "httpMethod": "POST",
         "path": "glofox-new-purchase",
-        "responseMode": "onReceived",
         "options": {}
       },
       "notes": "Receives Glofox membership/purchase events. Go-live needs Glofox to register this URL.",
@@ -25,16 +24,16 @@
       "type": "n8n-nodes-base.filter",
       "typeVersion": 2.2,
       "position": [
-        -780,
-        300
+        -784,
+        304
       ],
       "parameters": {
         "conditions": {
           "options": {
-            "version": 3,
-            "leftValue": "",
             "caseSensitive": true,
-            "typeValidation": "strict"
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
           },
           "conditions": [
             {
@@ -54,54 +53,13 @@
       "notes": "Only MEMBERSHIP_CREATED (a new purchase = a paid trial). Created-only for now. Every Social Fitness purchase is a paid trial, so no trial/paid split needed."
     },
     {
-      "id": "p3",
-      "name": "Lookup Studio Config",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.7,
-      "position": [
-        -560,
-        300
-      ],
-      "parameters": {
-        "authentication": "serviceAccount",
-        "documentId": {
-          "__rl": true,
-          "value": "10JeveuIeXNGsGyDQD5dvFLKzOoOzIN8ffRwszGuu2XA",
-          "mode": "id",
-          "cachedResultName": "Glofox to GHL - Studio Config"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "gid=0",
-          "mode": "list",
-          "cachedResultName": "Sheet1"
-        },
-        "filtersUI": {
-          "values": [
-            {
-              "lookupColumn": "Branch ID",
-              "lookupValue": "={{ ($('Glofox Webhook').item.json.body.Metadata || {}).location_id || 'NO_BRANCH_ID' }}"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "credentials": {
-        "googleApi": {
-          "id": "PvDoggN1HExofTc3",
-          "name": "Google Service Account account"
-        }
-      },
-      "alwaysOutputData": true
-    },
-    {
       "id": "p4",
       "name": "Get Member Email",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        -340,
-        300
+        -272,
+        304
       ],
       "parameters": {
         "url": "=https://gf-api.aws.glofox.com/prod/2.0/members/{{ $('Glofox Webhook').item.json.body.Payload.user_id }}",
@@ -114,15 +72,15 @@
             },
             {
               "name": "x-api-key",
-              "value": "={{ $('Lookup Studio Config').item.json['API Key'] }}"
+              "value": "={{ $('Lookup Studio (cache)').item.json.api_key }}"
             },
             {
               "name": "x-glofox-api-token",
-              "value": "={{ $('Lookup Studio Config').item.json['API Token'] }}"
+              "value": "={{ $('Lookup Studio (cache)').item.json.api_token }}"
             },
             {
               "name": "x-glofox-branch-id",
-              "value": "={{ $('Lookup Studio Config').item.json['Branch ID'] }}"
+              "value": "={{ $('Lookup Studio (cache)').item.json.branch_id }}"
             }
           ]
         },
@@ -136,8 +94,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        -120,
-        300
+        -48,
+        288
       ],
       "parameters": {
         "method": "POST",
@@ -162,13 +120,13 @@
         "jsonBody": "={\n  \"locationId\": \"JHgfCMprry4fxGOzRsYl\",\n  \"email\": \"{{ $('Get Member Email').item.json.email }}\",\n  \"firstName\": \"{{ $('Get Member Email').item.json.first_name }}\",\n  \"lastName\": \"{{ $('Get Member Email').item.json.last_name }}\",\n  \"phone\": \"{{ $('Get Member Email').item.json.metadata && $('Get Member Email').item.json.metadata.twilio ? $('Get Member Email').item.json.metadata.twilio.phone_number : $('Get Member Email').item.json.phone }}\",\n  \"tags\": [\"trial-purchase\"],\n  \"customFields\": [\n    {\n      \"key\": \"latest_offer_registered_for\",\n      \"field_value\": \"{{ $('Glofox Webhook').item.json.body.Payload.membership_definition.plan_name }}\"\n    }\n  ]\n}",
         "options": {}
       },
+      "notes": "Creates/updates the GHL contact: tag 'trial-purchase' + custom field 'latest_offer_registered_for' (= the plan they bought, from membership_definition.plan_name). Hardcoded test location JHgfCMprry4fxGOzRsYl (move to sheet for multi-studio). Consent defaults to yes (no dndSettings). Tag is a placeholder to finalise with stakeholders.",
       "credentials": {
         "httpHeaderAuth": {
           "id": "MrMlsn2HCSVdVi0O",
           "name": "HighLevel PIT - Test Sub Account"
         }
-      },
-      "notes": "Creates/updates the GHL contact: tag 'trial-purchase' + custom field 'latest_offer_registered_for' (= the plan they bought, from membership_definition.plan_name). Hardcoded test location JHgfCMprry4fxGOzRsYl (move to sheet for multi-studio). Consent defaults to yes (no dndSettings). Tag is a placeholder to finalise with stakeholders."
+      }
     },
     {
       "id": "np-guard-if",
@@ -176,8 +134,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -450,
-        300
+        -448,
+        304
       ],
       "parameters": {
         "conditions": {
@@ -185,12 +143,12 @@
             "version": 3,
             "leftValue": "",
             "caseSensitive": true,
-            "typeValidation": "loose"
+            "typeValidation": "strict"
           },
           "conditions": [
             {
               "id": "studio-found",
-              "leftValue": "={{ $('Lookup Studio Config').item.json['Branch ID'] }}",
+              "leftValue": "={{ $('Lookup Studio (cache)').item.json.branch_id }}",
               "rightValue": "",
               "operator": {
                 "type": "string",
@@ -216,13 +174,13 @@
       "notes": "Guard: continue only if branch found in sheet AND user_id present. Else -> Stop and Error (loud alert)."
     },
     {
-      "id": "save-branch-filter",
+      "id": "bff81c6f-99e3-4b04-b800-d277213a0a2f",
       "name": "Save Branch ID (filter)",
       "type": "n8n-nodes-base.executionData",
       "typeVersion": 1.1,
       "position": [
-        -880,
-        300
+        -896,
+        304
       ],
       "parameters": {
         "operation": "save",
@@ -234,8 +192,41 @@
             }
           ]
         }
+      }
+    },
+    {
+      "id": "962709ab-93b2-4bfe-a51a-15ef4157d948",
+      "name": "Lookup Studio (cache)",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -608,
+        304
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Ba4cRH8IzwZG9WqJ",
+          "cachedResultName": "studio_config"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "branch_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Glofox Webhook').item.json.body.Metadata.location_id }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1,
+        "options": {}
       },
-      "notes": "Saves the studio Branch ID as highlighted execution data so runs are filterable per-studio in the Executions list."
+      "notes": "Cache lookup: studio row from studio_config Data Table by branch_id (=location_id). Replaces per-event Google Sheets read (#19). No match -> halts silently."
     }
   ],
   "connections": {
@@ -254,7 +245,7 @@
       "main": [
         [
           {
-            "node": "Lookup Studio Config",
+            "node": "Lookup Studio (cache)",
             "type": "main",
             "index": 0
           }
@@ -266,17 +257,6 @@
         [
           {
             "node": "GHL: Upsert Contact",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Lookup Studio Config": {
-      "main": [
-        [
-          {
-            "node": "Studio In Sheet?",
             "type": "main",
             "index": 0
           }
@@ -299,6 +279,17 @@
         [
           {
             "node": "Only New Purchases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Studio (cache)": {
+      "main": [
+        [
+          {
+            "node": "Studio In Sheet?",
             "type": "main",
             "index": 0
           }
