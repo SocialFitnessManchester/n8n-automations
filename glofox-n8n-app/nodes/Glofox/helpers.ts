@@ -15,6 +15,8 @@ export interface StudioRow {
 	branchId: string;
 	apiKey: string;
 	apiToken: string;
+	ghlLocation: string;
+	ghlPit: string;
 }
 
 /**
@@ -109,8 +111,13 @@ export async function fetchStudioRows(
 		const branchId = (row[branchCol] ?? '').trim();
 		const apiKey = (row[apiKeyCol] ?? '').trim();
 		const apiToken = (row[apiTokenCol] ?? '').trim();
+		// GHL Location / PIT are read BY POSITION (columns 4 and 5), per the
+		// canonical sheet layout: Studio | Branch | API Key | API Token | GHL Location | GHL PIT.
+		// They are optional — not every row has them filled in yet.
+		const ghlLocation = (row[4] ?? '').trim();
+		const ghlPit = (row[5] ?? '').trim();
 		if (!studioName || !branchId || !apiKey || !apiToken) continue;
-		rows.push({ studioName, branchId, apiKey, apiToken });
+		rows.push({ studioName, branchId, apiKey, apiToken, ghlLocation, ghlPit });
 	}
 	return rows;
 }

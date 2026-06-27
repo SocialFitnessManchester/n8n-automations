@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-glofox",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Custom n8n community node for Glofox (Social Fitness). Sheet-backed studio dropdown + Lead and Purchase actions with dynamic dropdowns against the live Glofox API.",
   "keywords": [
     "n8n-community-node-package",
@@ -9,15 +9,14 @@
     "social-fitness"
   ],
   "license": "MIT",
-  "homepage": "https://github.com/SocialFitnessManchester/n8n-automations/tree/main/glofox-n8n-app",
+  "homepage": "https://github.com/SocialFitnessManchester/glofox-n8n-app",
   "author": {
     "name": "Social Fitness Automations",
     "email": "noreply@social-fitness.com"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/SocialFitnessManchester/n8n-automations.git",
-    "directory": "glofox-n8n-app"
+    "url": "git+https://github.com/SocialFitnessManchester/glofox-n8n-app.git"
   },
   "engines": {
     "node": ">=20.15"

@@ -17,13 +17,13 @@ import {
 
 export class Glofox implements INodeType {
 	description: INodeTypeDescription = {
-		displayName: 'Glofox: New Lead or Purchase',
+		displayName: 'Glofox: Lead, Purchase or Studio Config',
 		name: 'glofox',
 		icon: 'file:glofox.svg',
 		group: ['transform'],
 		version: 1,
-		subtitle: '={{ ($parameter["resource"] === "lead" ? "New Lead" : "New Purchase") + " @ " + $parameter["studio"] }}',
-		description: 'Create a new Lead, or assign a Purchase to an existing contact, in the selected Glofox studio. Studio is picked from a Google-Sheet-backed dropdown.',
+		subtitle: '={{ ($parameter["resource"] === "lead" ? "New Lead" : $parameter["resource"] === "purchase" ? "New Purchase" : "Studio Config") + " @ " + $parameter["studio"] }}',
+		description: 'Create a Lead, assign a Purchase, or output a studio\'s config (Glofox + GHL credentials), for the selected Glofox studio. Studio is picked from a Google-Sheet-backed dropdown.',
 		defaults: { name: 'Glofox' },
 		inputs: ['main'],
 		outputs: ['main'],
@@ -48,6 +48,7 @@ export class Glofox implements INodeType {
 				options: [
 					{ name: 'Lead', value: 'lead' },
 					{ name: 'Purchase', value: 'purchase' },
+					{ name: 'Studio', value: 'studio' },
 				],
 				default: 'lead',
 			},
@@ -82,6 +83,23 @@ export class Glofox implements INodeType {
 					},
 				],
 				default: 'create',
+			},
+
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				noDataExpression: true,
+				displayOptions: { show: { resource: ['studio'] } },
+				options: [
+					{
+						name: 'Get Config',
+						value: 'getConfig',
+						description: 'Output the selected studio\'s Glofox + GHL credentials from the config sheet',
+						action: 'Get studio config',
+					},
+				],
+				default: 'getConfig',
 			},
 
 			// ─── Lead.create fields ────────────────────────────────────────────
@@ -345,6 +363,21 @@ export class Glofox implements INodeType {
 					);
 					returnData.push({
 						json: { ...result, user_id: userId, membership_id: membershipId, plan_code: planCode },
+						pairedItem: { item: i },
+					});
+					continue;
+				}
+
+				if (resource === 'studio' && operation === 'getConfig') {
+					returnData.push({
+						json: {
+							studio_name: row.studioName,
+							branch_id: row.branchId,
+							api_key: row.apiKey,
+							api_token: row.apiToken,
+							ghl_location: row.ghlLocation,
+							ghl_pit: row.ghlPit,
+						},
 						pairedItem: { item: i },
 					});
 					continue;

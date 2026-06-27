@@ -1,0 +1,258 @@
+{
+  "name": "Glofox Initial Lead Sync (pick studio)",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "name": "Run Sync (manual)",
+      "position": [
+        0,
+        0
+      ],
+      "id": "11cd3c4d-2f8a-48f9-a302-7baa2fd3ec15"
+    },
+    {
+      "parameters": {
+        "studio": "Abhi Test",
+        "resource": "studio"
+      },
+      "type": "n8n-nodes-glofox.glofox",
+      "typeVersion": 1,
+      "name": "Pick Studio",
+      "position": [
+        224,
+        0
+      ],
+      "id": "c55ca4db-fa27-4285-a6e7-ed47f306455f",
+      "credentials": {
+        "glofoxApi": {
+          "id": "hRRashH0OejEkeP3",
+          "name": "Glofox (Sheet-backed) account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://gf-api.aws.glofox.com/prod/2.0/members",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "100"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $('Pick Studio').first().json.api_key }}"
+            },
+            {
+              "name": "x-glofox-api-token",
+              "value": "={{ $('Pick Studio').first().json.api_token }}"
+            },
+            {
+              "name": "x-glofox-branch-id",
+              "value": "={{ $('Pick Studio').first().json.branch_id }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "name": "page",
+                    "value": "={{ $pageCount + 1 }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ $response.body.has_more === false }}",
+              "limitPagesFetched": true,
+              "maxRequests": 30,
+              "requestInterval": 300
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "name": "Get All Leads (paged)",
+      "position": [
+        448,
+        0
+      ],
+      "id": "485b43c3-bc4e-4185-8020-ceb0eae3c87e"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst all = [];\nfor (const it of items) {\n  const j = it.json;\n  if (Array.isArray(j.data)) all.push(...j.data);\n  else if (j && (j._id || j.lead_status)) all.push(j);\n}\nconst isCustomer = s => s === 'MEMBER' || s === 'TRIAL';\nreturn all.map(l => ({ json: {\n  first_name: l.first_name || '', last_name: l.last_name || '',\n  email: l.email || l.contact_email || l.account_email || '',\n  phone: l.phone || '', lead_status: l.lead_status || '',\n  ghl_type: isCustomer(l.lead_status) ? 'customer' : 'lead', created: l.created\n}}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "name": "Flatten Leads",
+      "position": [
+        672,
+        -96
+      ],
+      "id": "55c868fc-ef14-4125-853b-b67470733012"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://services.leadconnectorhq.com/contacts/upsert",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Pick Studio').first().json.ghl_pit }}"
+            },
+            {
+              "name": "Version",
+              "value": "2021-07-28"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"locationId\": \"{{ $('Pick Studio').first().json.ghl_location }}\",\n  \"email\": \"{{ $json.email }}\",\n  \"firstName\": \"{{ $json.first_name }}\",\n  \"lastName\": \"{{ $json.last_name }}\",\n  \"phone\": \"{{ $json.phone }}\",\n  \"type\": \"{{ $json.ghl_type }}\",\n  \"source\": \"Glofox initial sync\",\n  \"tags\": [\"glofox-initial-sync\"]\n}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 8,
+              "batchInterval": 2000
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "name": "GHL: Upsert Contact",
+      "position": [
+        880,
+        -96
+      ],
+      "id": "cb1f7823-4ae5-4959-b3c2-96a329d5c1d9",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nlet total=0; const byStatus={}; const byType={};\nfor (const it of items) {\n  const data = Array.isArray(it.json.data) ? it.json.data : (it.json && it.json._id ? [it.json] : []);\n  total += data.length;\n  for (const l of data) {\n    byStatus[l.lead_status]=(byStatus[l.lead_status]||0)+1;\n    const t=(l.lead_status==='MEMBER'||l.lead_status==='TRIAL')?'customer':'lead';\n    byType[t]=(byType[t]||0)+1;\n  }\n}\nreturn [{ json: { total, by_status: JSON.stringify(byStatus), by_type: JSON.stringify(byType) } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "name": "Sync Summary",
+      "position": [
+        672,
+        144
+      ],
+      "id": "1de0d2b6-ce8c-4019-a395-c50379c98bb0"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "C0BAA7LNW3Y",
+          "cachedResultName": "#5c-n8n-errors"
+        },
+        "text": "=:white_check_mark: *Glofox initial sync \u2014 {{ $('Pick Studio').first().json.studio_name }}*\nPushed *{{ $json.total }}* records to GoHighLevel.\nBy status: {{ $json.by_status }}\nBy GHL type: {{ $json.by_type }}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "name": "Slack: Sync Done",
+      "position": [
+        880,
+        144
+      ],
+      "id": "ffc8bb2d-9a09-45cf-99e9-d065e6b1b8e1",
+      "webhookId": "a58bca9e-45b0-418a-92bc-ca763d444a1b",
+      "credentials": {
+        "slackApi": {
+          "id": "QEd0yOGZB7VXpmk6",
+          "name": "Slack account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Run Sync (manual)": {
+      "main": [
+        [
+          {
+            "node": "Pick Studio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Studio": {
+      "main": [
+        [
+          {
+            "node": "Get All Leads (paged)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Leads (paged)": {
+      "main": [
+        [
+          {
+            "node": "Flatten Leads",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Sync Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flatten Leads": {
+      "main": [
+        [
+          {
+            "node": "GHL: Upsert Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sync Summary": {
+      "main": [
+        [
+          {
+            "node": "Slack: Sync Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  }
+}
