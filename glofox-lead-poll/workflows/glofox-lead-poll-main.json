@@ -1,0 +1,166 @@
+{
+  "name": "Glofox Lead Poll (all studios, every 6h)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "name": "Every 6 Hours",
+      "position": [
+        0,
+        0
+      ],
+      "id": "eae5dd35-ad8c-4127-85bf-2a69773529b3"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Ba4cRH8IzwZG9WqJ",
+          "cachedResultName": "studio_config"
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "name": "Get Studios",
+      "position": [
+        224,
+        0
+      ],
+      "id": "1ce1b870-1bae-4766-b17b-af5740a8a2b7"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "4874c172-bd07-4956-abfe-7a00f1a7ab44",
+              "leftValue": "={{ $json.ghl_pit }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "077dbac7-9ab3-4e89-80a3-5cb6fb3241e5",
+              "leftValue": "={{ $json.api_key }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "b9419835-7a5d-4efe-9a03-d229c888df54",
+              "leftValue": "={{ $json.branch_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "name": "Only GHL-ready",
+      "position": [
+        448,
+        0
+      ],
+      "id": "da72485f-2543-4385-aaed-e7b8bc7d6062"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "btcLAW4tzEymNG9s",
+          "mode": "id",
+          "cachedResultName": "Glofox Lead Poll \u2014 single studio (sub)"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "name": "Poll Each Studio",
+      "position": [
+        672,
+        0
+      ],
+      "id": "7d4124b7-67a7-4568-a812-5182ca41d18f"
+    }
+  ],
+  "connections": {
+    "Every 6 Hours": {
+      "main": [
+        [
+          {
+            "node": "Get Studios",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Studios": {
+      "main": [
+        [
+          {
+            "node": "Only GHL-ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Only GHL-ready": {
+      "main": [
+        [
+          {
+            "node": "Poll Each Studio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

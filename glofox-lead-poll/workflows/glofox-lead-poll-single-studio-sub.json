@@ -1,0 +1,237 @@
+{
+  "name": "Glofox Lead Poll \u2014 single studio (sub)",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "name": "Studio In",
+      "position": [
+        0,
+        0
+      ],
+      "id": "7715a2da-23d2-42eb-a26e-d79ae14ef8f9"
+    },
+    {
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "ACJBM7zGZMspXFqw",
+          "cachedResultName": "lead_poll_state"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "branch_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.branch_id }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "name": "Get Marker",
+      "position": [
+        220,
+        -120
+      ],
+      "id": "4ee25359-d2a0-4a39-80e3-9eda2fa03396"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://gf-api.aws.glofox.com/prod/2.0/members",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "lead_status",
+              "value": "LEAD"
+            },
+            {
+              "name": "limit",
+              "value": "100"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $json.api_key }}"
+            },
+            {
+              "name": "x-glofox-api-token",
+              "value": "={{ $json.api_token }}"
+            },
+            {
+              "name": "x-glofox-branch-id",
+              "value": "={{ $json.branch_id }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "name": "Get Leads",
+      "position": [
+        220,
+        80
+      ],
+      "id": "9e82036e-dfe9-4929-86e5-e88ecea65c3a"
+    },
+    {
+      "parameters": {
+        "jsCode": "const markers = $('Get Marker').all();\nconst marker = markers.length ? Number(markers[0].json.last_seen_created) : Math.floor(Date.now()/1000);\nconst leads = ($input.first().json.data) || [];\nconst fresh = leads.filter(l => Number(l.created) > marker).sort((a,b)=>a.created-b.created);\nreturn fresh.map(l => ({ json: {\n  first_name: l.first_name || '', last_name: l.last_name || '',\n  email: l.email || l.contact_email || l.account_email || '', phone: l.phone || ''\n}}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "name": "Find New Leads",
+      "position": [
+        440,
+        80
+      ],
+      "id": "cdb3fd1c-9bdb-41b5-a258-c73e11fc3f24"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://services.leadconnectorhq.com/contacts/upsert",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Studio In').item.json.ghl_pit }}"
+            },
+            {
+              "name": "Version",
+              "value": "2021-07-28"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"locationId\": \"{{ $('Studio In').item.json.ghl_location }}\",\n  \"email\": \"{{ $json.email }}\",\n  \"firstName\": \"{{ $json.first_name }}\",\n  \"lastName\": \"{{ $json.last_name }}\",\n  \"phone\": \"{{ $json.phone }}\",\n  \"type\": \"lead\",\n  \"source\": \"Glofox lead poll\",\n  \"tags\": [\"new-lead\"]\n}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 8,
+              "batchInterval": 2000
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "name": "GHL: Upsert Contact",
+      "position": [
+        660,
+        80
+      ],
+      "id": "f25fae4f-f084-4e74-82c1-d73a9065d6ec",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "resource": "row",
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "ACJBM7zGZMspXFqw",
+          "cachedResultName": "lead_poll_state"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "branch_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Studio In').item.json.branch_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "branch_id": "={{ $('Studio In').item.json.branch_id }}",
+            "last_seen_created": "={{ ($json.data && $json.data.length) ? $json.data[0].created : Math.floor($now.toSeconds()) }}"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "name": "Update Marker",
+      "position": [
+        440,
+        -120
+      ],
+      "id": "42d1ec9d-07e1-4f32-ae4e-a837416cefbd"
+    }
+  ],
+  "connections": {
+    "Studio In": {
+      "main": [
+        [
+          {
+            "node": "Get Marker",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Leads": {
+      "main": [
+        [
+          {
+            "node": "Find New Leads",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Update Marker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find New Leads": {
+      "main": [
+        [
+          {
+            "node": "GHL: Upsert Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
